@@ -1,16 +1,19 @@
 #' analyse.FACS
 #'
-#' Interactive analysis of FACS data from raw files.
+#'Interactive analysis of FACS data from raw files.
+#' @import tidyverse
+#' @import flowCore
+#' @import flowGate
+#' @import flowWorkspace
+#' @import ncdfFlow
+#' @import data.table
+#' @import toOrdinal
+#'
+#' @examples
+#' analyse.FACS()
+#' @export
 
 analyzeFACS <- function() {
-
-  require(flowCore)
-  require(flowGate)
-  require(flowWorkspace)
-  require(ncdfFlow)
-  require(tidyverse)
-  require(data.table)
-  require(toOrdinal)
 
   FCSfolder <- choose.dir(default=".", caption="Select a folder with fcs files.")
   fcsfiles <- list.files(FCSfolder,pattern=".fcs$",ignore.case=TRUE,full.names=TRUE)

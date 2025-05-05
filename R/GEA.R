@@ -1,7 +1,7 @@
 #' GEA
 #'
 #' Gene  enrichment analysis
-#' 
+#'
 #' @param pathways Data frame with columns 'id','pathway.type' and 'pathway.name', or at least a
 #' data frame with three columns and this content.
 #' @param genes Vector with gene IDs, must have overlap with IDs in the pathways data frame.
@@ -10,11 +10,13 @@
 #' @param plot.padj.cutoff Numeric: Adjusted p-value cutoff for plotting. Default is 0.05.
 #' @param plot.stat Character string: which p-value should be used for plotting? "HP" for hypergeometric
 #' p-value and "BP" for binomial.
-#' 
+#'
 #' @import tidyverse
-#' @return A list with four elements:
-#' $data with the enrichment result in a table form,
-#' $plot for the enrichment plot.#' @examples 
+#' @return A list with two elements:
+#' \item{data}{Data with the enrichment result in a table form}
+#' \item{plot}{Enrichment plot}
+#'
+#' @examples
 #' gea.result <- GEA(pathways,genes)
 #' @export
 
@@ -27,7 +29,7 @@ GEA <- function(
   plot.padj.cutoff=0.05,
   plot.stat="HP") #HP or BP
 {
-  
+
   if(!plot.stat %in% c("HP","BP")) {
     stop("plot.stat can only be 'HP' or 'BP'.")
   }
@@ -41,7 +43,7 @@ GEA <- function(
   }
   pathways <- pathway.prep$data
   rm(pathway.prep)
-  
+
   if(is.null(genes)) {
     stop("Please include genes.")
   }
@@ -49,16 +51,16 @@ GEA <- function(
   if(pint<minsize) {
     stop(paste0("Insufficient number of genes (",pint,")."))
   }
-  
-  r <- r.adj <- data.frame(matrix(ncol = 10, nrow = 0)) %>% 
+
+  r <- r.adj <- data.frame(matrix(ncol = 10, nrow = 0)) %>%
     setNames(c("P","Db","T","D","W","S","UD","HP","BP","GL")) %>% rbind.data.frame()
   # r=data.frame(P="PathwayName",Db="Database", T="Annotated",D="Drawn",W="Anno_inPathway",S="InputPathway",
   #              UD="Direction of deviation from expected", HP="Hypergeometric_P",BP="Binomial_P",GL="GeneList")
-  
+
   dbs <- pathways$pathway.type %>% unique()
-  
+
   for(db in dbs)  {
-    dbg = pathways %>% filter(pathway.type==db) %>% pull(id) %>% unique() 
+    dbg = pathways %>% filter(pathway.type==db) %>% pull(id) %>% unique()
     dbGN <- length(dbg)
     db_inputGN <- length(intersect(dbg,genes))
     groups <- pathways %>% filter(pathway.type==db) %>% pull(pathway.name) %>% unique()
@@ -69,10 +71,10 @@ GEA <- function(
       gr_inputGN = length(intersect(gr_genes,genes))
       #print(gr_inputGN)
       if(gr_inputGN >= minsize) {
-        
+
         hp=1-phyper(gr_inputGN,grGN,(dbGN-grGN),db_inputGN);
         bp=binom.test(gr_inputGN,db_inputGN,p=grGN/dbGN,alternative="greater")$p.value;
-        
+
         if (hp<p.cutoff) {
           rr=data.frame(P=gr,Db=db, T=as.character(dbGN),D=as.character(db_inputGN),W=as.character(grGN),S=as.character(gr_inputGN),
                         UD="over", HP=as.character(hp),BP=as.character(bp),GL=paste(intersect(gr_genes,genes),collapse=","))
@@ -86,12 +88,12 @@ GEA <- function(
       }
     }
   }
-  
+
   # p.adjustment
   r.adj=data.frame(G="Group",P="PathwayName",Db="Database", T="Annotated",D="Drawn",W="Anno_inPathway",S="InputPathway",
                    UD="Direction of deviation from expected", HP="Hypergeometric_P",BP="Binomial_P",
                    GL="GeneList", HP.adj="Hypergeometric_P.adj", BP.adj="Binomial_P.adj")
-  
+
   r.adj <- r %>%
     mutate(across(c(HP,BP), as.numeric)) %>%
     group_by(Db) %>%
@@ -100,7 +102,7 @@ GEA <- function(
     ungroup() %>%
     setNames(c("pathway.name","pathway.type","annotated","drawn","anno_inPathway","inputPathway",
                "direction","HP","BP","GL","HP.adj","BP.adj"))
-  
+
   r.plotdata <- r.adj %>%
     dplyr::select(pathway.name,inputPathway,direction,starts_with(plot.stat)) %>%
     setNames(c("Pathway","Size","Enrichment","p","p.adj")) %>%
@@ -115,11 +117,11 @@ GEA <- function(
     coord_flip() +
     labs(x="Pathway", y="Adjusted p-value") +
     theme_bw()
-  
+
   output <- list(
     data=r.adj,
     plot=r.plotdata
   )
-  
+
   return(output)
 }

@@ -1,7 +1,7 @@
 #' estimateIDC
 #'
 #' Estimate IDC of a sample based on a reference
-#' 
+#'
 #' @param data A data frame with columns "Accession","Value" and "Sample".
 #' @param reference The reference timepoint data frame.
 #' @param data.hpi How long is the cycle of the Plasmodium strain in samples?
@@ -12,8 +12,12 @@
 #' @import tidyverse
 #' @import gtools
 #' @import viridis
-#' @return 
-#' @examples 
+#'
+#' @return A list containing:
+#' \item{data}{Calculated data.}
+#' \item{plot}{Correlation plot.}
+#'
+#' @examples
 #' estimateIDC(data)
 #' @export
 
@@ -41,21 +45,21 @@ estimateIDC <- function(
     }
     rm(data.prep)
   }
-  
-  ref <- reference %>% 
+
+  ref <- reference %>%
     pivot_longer(cols=starts_with("tp"), values_to="Value",names_to="Ref.point") %>%
     mutate(Ref.point=factor(Ref.point,levels=gtools::mixedsort(unique(Ref.point))))
-  
+
   if(log2transform) {
     data <- data %>% mutate(Value=log2(Value))
     ref <- ref %>% mutate(Value=log2(Value))
   }
-  
+
   samples <- gtools::mixedsort(unique(data$Sample))
   reference.points <- levels(ref$Ref.point)
-  
+
   combs <- expand_grid(samples,reference.points)
-  
+
   corel<-c()
   for(i in 1:nrow(combs)) {
     rcombs <- combs %>% slice(i)
@@ -72,14 +76,14 @@ estimateIDC <- function(
   combs <- combs %>%
     mutate(cor=corel) %>%
     mutate(reference.points=as.numeric(str_remove(reference.points,"tp")))
-  
+
   reference.levels <- as.numeric(str_remove(reference.points,"tp"))
   if(scale) {
     combs$reference.points <- combs$reference.points*data.hpi/reference.hpi
     reference.levels <- reference.levels*data.hpi/reference.hpi
-    
+
   }
-  
+
   corel_plot <- combs %>%
     setNames(c("Sample","Reference","Cor")) %>%
     mutate(Reference=factor(Reference,levels=gtools::mixedsort(unique(reference.levels)))) %>%
@@ -87,15 +91,15 @@ estimateIDC <- function(
     ggplot() +
     geom_tile(mapping=aes(x=Reference,y=Sample,fill=Cor)) +
     scale_fill_viridis(name="Correlation", option="turbo") + coord_equal() +
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.3)) + 
-    scale_x_discrete(name="Reference timepoint (hpi)",expand=c(0,0)) + 
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.3)) +
+    scale_x_discrete(name="Reference timepoint (hpi)",expand=c(0,0)) +
     scale_y_discrete(name="Sample",expand=c(0,0))
 
   output<-list(
     data=combs,
     plot=corel_plot
   )
-  
+
   return(output)
 }
 
