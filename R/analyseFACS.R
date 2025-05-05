@@ -1,5 +1,9 @@
+#' analyse.FACS
+#'
+#' Interactive analysis of FACS data from raw files.
+
 analyzeFACS <- function() {
-  
+
   require(flowCore)
   require(flowGate)
   require(flowWorkspace)
@@ -7,7 +11,7 @@ analyzeFACS <- function() {
   require(tidyverse)
   require(data.table)
   require(toOrdinal)
-  
+
   FCSfolder <- choose.dir(default=".", caption="Select a folder with fcs files.")
   fcsfiles <- list.files(FCSfolder,pattern=".fcs$",ignore.case=TRUE,full.names=TRUE)
   l.fcs <- length(fcsfiles)
@@ -16,15 +20,15 @@ analyzeFACS <- function() {
   } else {
     cat(paste0("Found ", l.fcs, " FCS files.\n"))
   }
-  
+
   gatingsample <- choose.files(default=FCSfolder, "Choose the FCS file that will be used for gating",
                                multi=FALSE,filters="fcs$|FCS$") %>%
     str_split_1("\\\\") %>% .[length(.)]
-  
-  
+
+
   saveRAM <- askYesNo("Do you want to save RAM when handling the data? Recommended for large data sets.")
-  
- 
+
+
   if(saveRAM) {
     fs <- read.ncdfFlowSet(
       files=fcsfiles
@@ -32,25 +36,25 @@ analyzeFACS <- function() {
   } else {
     fs <- read.flowSet(path = FCSfolder,
                        pattern = ".fcs$|.FCS$",
-                       full.names = TRUE) 
+                       full.names = TRUE)
   }
   gs <- GatingSet(fs)
-  
+
   spill.mat <- spillover(fs[[1]]) %>% .[!sapply(., is.null)]
   if(length(spill.mat)==1) {
     spill.mat <- spill.mat[[1]]
   }
-  
+
   comp <- compensation(spill.mat)
   gsc <- compensate(gs, comp)
-  
+
   cat("The following channels are available:\n")
   cat("Channel names from the data: ", paste(colnames(gsc),collapse=", "),"\n")
   cat("Channel names explainer:\n")
   print(markernames(gsc))
   cat("Please choose the channels to use for gating in the order of gating.\n")
   cat("(follow the format Gate name, Parent gate: channel-on-x-axis, channel-on-y-axis etc)\n")
-  
+
   channel_redoing <- TRUE
   while(channel_redoing) {
     channels <- c()
@@ -64,7 +68,7 @@ analyzeFACS <- function() {
         i=i+1
       }
     }
-    
+
     ctable <- data.frame(ch=channels) %>%
       slice_head(n=-1) %>%
       separate_wider_delim(cols=ch,delim=":",names=c("Gates","Channels")) %>%
@@ -73,8 +77,8 @@ analyzeFACS <- function() {
       mutate(across(everything(),function(x) str_replace(str_trim(x)," ","."))) %>%
       mutate(Parent=ifelse(is.na(Parent),"root",Parent)) %>%
       mutate(ChannelY=ifelse(is.na(Parent),NULL,ChannelY))
-    
-    
+
+
     if(any(duplicated(ctable$Gate))) {
       dup.gate <- ctable$Gate[duplicated(ctable$Gate)]
       message("The following gates have duplicate name. Please make sure that the gates have the same names.")
@@ -105,7 +109,7 @@ analyzeFACS <- function() {
       }
     }
   }
-  
+
   # gating
   gates <- list()
   gsample <- which(sampleNames(gsc)==gatingsample)
@@ -116,7 +120,7 @@ analyzeFACS <- function() {
                                       subset=ctable$Parent[i],
                                       dims = list(ctable$ChannelX[i],ctable$ChannelY[i]))
   }
-  
+
   regate <- askYesNo("Are you happy with the gates? If you want to redo them, click No.")
   while(!regate) {
     gates <- list()
@@ -130,16 +134,16 @@ analyzeFACS <- function() {
     }
     regate <- askYesNo("Are you happy with the gates? If you want to redo them, click No.")
   }
-  
+
   # plotting
-  
+
   gatepaths <- gs_get_pop_paths(gsc, path = "full") %>% .[.!="root"]
   ctable$Path = gatepaths
-  
+
 
   cplots <- list()
   for(i in 1:nrow(ctable)) {
-    
+
     cplots[[ctable$Path[i]]] <-
       ggcyto(gsc, aes(x =!!sym(ctable$ChannelX[i]), y = !!sym(ctable$ChannelY[i])), subset = ctable$Parent[i]) +
       geom_hex(bins = 200) +
@@ -154,11 +158,11 @@ analyzeFACS <- function() {
       ggtitle(paste0("Gate ", ctable$Path[i])) +
       theme(panel.grid=element_blank())
   }
-  
+
   stats <- gs_pop_get_count_fast(gsc,"count",format="wide") %>%
     t() %>% as.data.frame() %>%
     rownames_to_column("Sample")
-  
+
   saveoutput <- askYesNo("Do you want to save the table and plots to your hard drive?")
   if(saveoutput) {
     save.dir <- choose.dir(default=".")
@@ -167,11 +171,11 @@ analyzeFACS <- function() {
     }
     fwrite(stats,paste0(save.dir,"\\counts.csv"))
   }
-  
+
   output <- list(
     counts=stats,
     plots=cplots
   )
-  
+
   return(output)
 }
