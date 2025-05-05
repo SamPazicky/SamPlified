@@ -6,6 +6,7 @@
 #' @param substitutionMatrix Argument as in Biostrings::pairwiseAlignment
 #' @import msa
 #' @import tools
+#' @import Biostrings
 #'
 #' @return A list containing:
 #' \item{alignment}{Alignment between two sequences.}
