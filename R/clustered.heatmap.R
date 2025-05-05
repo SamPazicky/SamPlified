@@ -52,7 +52,7 @@ clustered.heatmap <- function(
 
   if(cl.group!="all") {
     widedata <- data %>%
-      filter(group==cl.group)
+      dplyr::filter(group==cl.group)
   } else {
     widedata <- data
   }

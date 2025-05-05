@@ -60,13 +60,13 @@ GEA <- function(
   dbs <- pathways$pathway.type %>% unique()
 
   for(db in dbs)  {
-    dbg = pathways %>% filter(pathway.type==db) %>% pull(id) %>% unique()
+    dbg = pathways %>% dplyr::filter(pathway.type==db) %>% pull(id) %>% unique()
     dbGN <- length(dbg)
     db_inputGN <- length(intersect(dbg,genes))
-    groups <- pathways %>% filter(pathway.type==db) %>% pull(pathway.name) %>% unique()
+    groups <- pathways %>% dplyr::filter(pathway.type==db) %>% pull(pathway.name) %>% unique()
 
     for(gr in groups) {
-      gr_genes = pathways %>% filter(pathway.name==gr) %>% pull(id) %>% unique()
+      gr_genes = pathways %>% dplyr::filter(pathway.name==gr) %>% pull(id) %>% unique()
       grGN=length(gr_genes)
       gr_inputGN = length(intersect(gr_genes,genes))
       #print(gr_inputGN)
@@ -107,7 +107,7 @@ GEA <- function(
     dplyr::select(pathway.name,inputPathway,direction,starts_with(plot.stat)) %>%
     setNames(c("Pathway","Size","Enrichment","p","p.adj")) %>%
     mutate(Size=as.numeric(Size)) %>%
-    filter(p.adj<=plot.padj.cutoff) %>%
+    dplyr::filter(p.adj<=plot.padj.cutoff) %>%
     mutate(p.adj=ifelse(p.adj==0,min(p.adj)*0.01,p.adj)) %>%
     mutate(Pathway=str_remove(Pathway,"GO-[[:digit:]]+-[[:alpha:]]+-|KEGG-pfa[[:digit:]]+-|Sach-|Till-|MPM-MPMP[[:digit:]]+-")) %>%
     ggplot(aes(reorder(Pathway,p.adj), -log10(p.adj))) +

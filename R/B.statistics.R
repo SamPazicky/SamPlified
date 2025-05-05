@@ -245,8 +245,8 @@ B.statistics <- function(
 
   volcano_plots.separate <- list()
   for(comp in unique(limma_results$comparison)) {
-    limma_resuts.separate <- limma_results%>%filter(comparison==comp)
-    volcano_plots.separate[[comp]]<- ggplot(data = limma_results%>%filter(comparison==comp), aes(logFC, -log10(fdr), colour = hit_annotation)) +
+    limma_resuts.separate <- limma_results%>%dplyr::filter(comparison==comp)
+    volcano_plots.separate[[comp]]<- ggplot(data = limma_results%>%dplyr::filter(comparison==comp), aes(logFC, -log10(fdr), colour = hit_annotation)) +
       geom_vline(aes(xintercept = 0)) +
       geom_point() +
       geom_text(aes(label = gsub("[|].+", "", id)),

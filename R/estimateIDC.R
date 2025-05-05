@@ -64,8 +64,8 @@ estimateIDC <- function(
   for(i in 1:nrow(combs)) {
     rcombs <- combs %>% slice(i)
     rdata <- left_join(
-      data %>% filter(Sample==rcombs$samples),
-      ref %>% filter(Ref.point==rcombs$reference.points),
+      data %>% dplyr::filter(Sample==rcombs$samples),
+      ref %>% dplyr::filter(Ref.point==rcombs$reference.points),
       by="Accession"
     ) %>%
       dplyr::select(starts_with("Value")) %>%
