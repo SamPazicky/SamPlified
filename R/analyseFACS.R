@@ -8,6 +8,7 @@
 #' @import ncdfFlow
 #' @import data.table
 #' @import toOrdinal
+#' @import ggcyto
 #'
 #' @examples
 #' analyse.FACS()
