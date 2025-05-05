@@ -77,7 +77,7 @@ GSEA <- function (
     x %>% mutate(pathway.name=str_remove(pathway,"GO-[[:digit:]]+-[[:alpha:]]+-|KEGG-pfa[[:digit:]]+-|Sach-|Till-|MPM-MPMP[[:digit:]]+-"))
   )
   # filter by adjusted p.value and put together
-  GSEA_enriched <- lapply(GSEA_result, function(x) filter(x,padj<=p.cutoff))
+  GSEA_enriched <- lapply(GSEA_result, function(x) dplyr::filter(x,padj<=p.cutoff))
   GSEA_enriched_table <- reduce(GSEA_enriched,bind_rows) %>% arrange(padj)
 
   if(nrow(GSEA_enriched_table)==0) {
