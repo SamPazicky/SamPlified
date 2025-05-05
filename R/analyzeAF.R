@@ -1,10 +1,10 @@
 analyzeAF <- function(
   folder=NA
 ) {
-  
+
   require(jsonlite)
   require(tidyverse)
-  
+
   if(is.na(folder)) {
     stop("Please include a folder")
   } else if(!file.exists(folder)) {
@@ -14,11 +14,11 @@ analyzeAF <- function(
       folder <- paste0(folder,"/")
     }
   }
-  
+
   fd.files <- list.files(folder,pattern="full_data.*json$", full.names=TRUE) %>%
     gtools::mixedsort()
   jr.file <- list.files(folder,pattern="job_request.json$", full.names=TRUE)
-  
+
   # get sequences etc.
   jrfile <- fromJSON(jr.file)
   sequences <- rep(
@@ -37,12 +37,12 @@ analyzeAF <- function(
                                         xmax=sequences.ends[x],
                                         ymin=sequences.starts[x],
                                         ymax=sequences.ends[x]))
-  
+
   for(fdf in fd.files) {
     jfile <- fromJSON(fdf)
-    
-    cor.data <- jfile$pae %>% as.data.frame() %>% 
-      pivot_longer(cols=everything(),names_to="AA.no",values_to="PAE") %>% 
+
+    cor.data <- jfile$pae %>% as.data.frame() %>%
+      pivot_longer(cols=everything(),names_to="AA.no",values_to="PAE") %>%
       mutate(AA.no=str_remove(AA.no,"V")) %>%
       left_join(sequences.res,by="AA.no") %>%
       rename_with(~paste0("aligned",.x), starts_with("AA")) %>%
@@ -50,7 +50,7 @@ analyzeAF <- function(
       left_join(sequences.res,by="AA.no") %>%
       rename_with(~paste0("scored",.x), starts_with("AA")) %>%
       dplyr::select(starts_with("scored"),starts_with("aligned"),PAE)
-    
+
     cor.plot <- ggplot(cor.data) +
       geom_tile(aes(x=scoredAA.no,y=alignedAA.no, fill=PAE)) +
       scale_fill_gradient(low="darkgreen",high="white")
@@ -58,19 +58,9 @@ analyzeAF <- function(
       cor.plot <- cor.plot +
         geom_rect(aes(!!!sequences.rects[[i]]))
     }
-    
+
     ggsave("corplot.png",cor.plot, width=10,height=10,units="cm")
-    
-    
+
+
   }
-  
-  
 }
-
-
-library(jsonlite)
-
-setwd("C:/Users/spazi/OneDrive - Nanyang Technological University/Documents/Projects/Complexome/Structure_predictions/PfAlba_dimers")
-
-jfile <- fromJSON("fold_pfalba1_2_1_1/fold_pfalba1_2_1_1_full_data_0.json")
-pae_matrix <- do.call(rbind, jfile$pae)
