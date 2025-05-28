@@ -5,7 +5,7 @@
 #'
 #' The implementation is heavily inspired by code from the limma-for-proteomics
 #' GitHub repository: \url{https://github.com/41ison/limma-for-proteomics}
-#' 
+#'
 #' @param file Path to the DIA-NN `.parquet` report file.
 #' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
 #' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
@@ -21,7 +21,7 @@
 #' @importFrom purrr map
 #' @import limma
 #' @importFrom ggrepel geom_text_repel
-#' 
+#'
 #' @return A named list with the following elements:
 #' \describe{
 #'   \item{all_results}{A data frame of differential analysis results.}
@@ -52,46 +52,46 @@ analyze.DIAPISA <- function(file,
                             ctrl.name = "Ctrl",
                             FC.cutoff = 1.2,
                             p.cutoff = 0.05) {
-  
+
 
   diann_report <- arrow::read_parquet(file) %>%
     dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
-    dplyr::mutate(File.Name = Run) %>% 
+    dplyr::mutate(File.Name = Run) %>%
     dplyr::filter(str_detect(Protein.Ids, "cRAP", negate = TRUE))
-  
+
   cnt <- count(diann_report, Run) %>% nrow()
   cat("Analyzing", cnt, "samples...\n")
-  
+
   prot_mtx <- diann::diann_matrix(diann_report,
                                   id.header = "Protein.Ids",
                                   quantity.header = "Genes.MaxLFQ.Unique",
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
-  
+
   groups_for_design <- str_extract(colnames(prot_mtx), paste0("(?<=", extract.after, ").*(?=", extract.before, ")"))
   design_matrix <- model.matrix(~ 0 + groups_for_design)
   colnames(design_matrix) <- levels(factor(groups_for_design))
-  
+
   limma_model <- lmFit(log2(prot_mtx), design = design_matrix, method = "ls")
-  
+
   all_groups <- colnames(design_matrix)
   comparisons <- setdiff(all_groups, ctrl.name)
-  
+
   contrast_formulae <- setNames(
     lapply(comparisons, function(grp) paste0(grp, "-", ctrl.name)),
     comparisons
   )
-  
+
   contrast_matrix <- makeContrasts(
     contrasts = unlist(contrast_formulae),
     levels = all_groups
   )
-  
+
   estimated_coef <- contrasts.fit(limma_model, contrast_matrix)
   empirical_Bayes_fit <- eBayes(estimated_coef)
-  
+
   contrast_names <- colnames(contrast_matrix)
-  
+
   all_results <- purrr::map_dfr(contrast_names, function(contrast) {
     topTable(empirical_Bayes_fit,
              coef = contrast,
@@ -106,9 +106,9 @@ analyze.DIAPISA <- function(file,
       TRUE ~ "Not significant"),
       status = factor(status, levels = c("Destabilized", "Not significant", "Stabilized"))
     )
-  
+
   max_logfc <- ceiling(max(abs(all_results$logFC), na.rm = TRUE))
-  
+
   volcano_facet <- ggplot(all_results, aes(x = logFC, y = -log10(adj.P.Val), color = status)) +
     geom_point(aes(alpha = status)) +
     scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3)) +
@@ -131,28 +131,28 @@ analyze.DIAPISA <- function(file,
       axis.title = element_text(face = "bold")
     ) +
     xlim(-max_logfc, max_logfc)
-  
+
   volcano_list <- purrr::map(unique(all_results$Contrast), function(contrast_name) {
-    
+
     df <- all_results %>% filter(Contrast == contrast_name)
-    
+
     count_stabilized <- df %>% filter(status == "Stabilized") %>% nrow()
     count_destabilized <- df %>% filter(status == "Destabilized") %>% nrow()
-    
+
     max_logfc <- ceiling(max(abs(df$logFC), na.rm = TRUE))
     ymax <- max(-log10(df$adj.P.Val), na.rm = TRUE) + 0.5
     y_offset <- ymax * 0.05
     text_y_pos <- ymax + y_offset
-    
+
     ggplot(df, aes(x = logFC, y = -log10(adj.P.Val))) +
       geom_point(aes(alpha = status, color = status)) +
       scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3)) +
       geom_hline(yintercept = -log10(p.cutoff), linetype = "dashed", color = "black") +
       geom_vline(xintercept = c(-log2(FC.cutoff), log2(FC.cutoff)), linetype = "dashed", color = "black") +
-      annotate("text", x = -max_logfc, y = text_y_pos, 
+      annotate("text", x = -max_logfc, y = text_y_pos,
                label = paste0("Destabilized: ", count_destabilized),
                hjust = 0, fontface = "bold", size = 4) +
-      annotate("text", x = max_logfc, y = text_y_pos, 
+      annotate("text", x = max_logfc, y = text_y_pos,
                label = paste0("Stabilized: ", count_stabilized),
                hjust = 1, fontface = "bold", size = 4) +
       ggrepel::geom_text_repel(
@@ -181,7 +181,7 @@ analyze.DIAPISA <- function(file,
       xlim(-max_logfc, max_logfc)
   }) %>%
     rlang::set_names(unique(all_results$Contrast))
-  
+
   label_data <- all_results %>%
     group_by(Contrast) %>%
     summarize(
@@ -191,7 +191,7 @@ analyze.DIAPISA <- function(file,
       max_fc = max(abs(logFC), na.rm = TRUE),
       .groups = "drop"
     )
-  
+
   MD_plot_faceted <- ggplot(all_results, aes(x = AveExpr, y = logFC, color = status)) +
     geom_point(aes(alpha = status)) +
     scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3)) +
@@ -211,7 +211,7 @@ analyze.DIAPISA <- function(file,
       axis.text = element_text(color = "black"),
       axis.title = element_text(face = "bold")
     )
-  
+
   return(list(
     all_results = all_results,
     volcano_facet = volcano_facet,
