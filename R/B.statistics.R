@@ -44,6 +44,9 @@ B.statistics <- function(
     }
     rm(data.prep)
   }
+  
+  if (is.na(control)) stop("Please specify a valid control condition.")
+  
 
   ndata <- data %>%
     mutate(condition=make.names(condition))
@@ -185,7 +188,7 @@ B.statistics <- function(
     rm(limma_hits, fdrtool_hits)
   }
   # table(limma_results$hit_annotation_method)
-  limma_results$hit_annotation_method <- "limma"
+  # limma_results$hit_annotation_method <- "limma"
 
   limma_results$pvalue[limma_results$hit_annotation_method == "limma"] <-
     limma_results$pvalue.limma[limma_results$hit_annotation_method == "limma"]
@@ -246,7 +249,7 @@ B.statistics <- function(
   volcano_plots.separate <- list()
   for(comp in unique(limma_results$comparison)) {
     limma_resuts.separate <- limma_results%>%dplyr::filter(comparison==comp)
-    volcano_plots.separate[[comp]]<- ggplot(data = limma_results%>%dplyr::filter(comparison==comp), aes(logFC, -log10(fdr), colour = hit_annotation)) +
+    volcano_plots.separate[[comp]]<- ggplot(data = limma_resuts.separate, aes(logFC, -log10(fdr), colour = hit_annotation)) +
       geom_vline(aes(xintercept = 0)) +
       geom_point() +
       geom_text(aes(label = gsub("[|].+", "", id)),
