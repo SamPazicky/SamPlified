@@ -73,7 +73,7 @@ DESeq2.pca.analysis <- function(
          x = paste0("PC1: ", round(attr(pcadata, "percentVar")[1] * 100), "% variance"),
          y = paste0("PC2: ", round(attr(pcadata, "percentVar")[2] * 100), "% variance")) +
     theme_bw() +
-    theme(legend.position=element_blank())
+    theme(legend.position="none")
 
   output <- list(
     data=pcadata,
