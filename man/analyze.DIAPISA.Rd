@@ -8,9 +8,11 @@ analyze.DIAPISA(
   file,
   extract.after = "DIA_",
   extract.before = "_",
+  exclude = c(),
   ctrl.name = "Ctrl",
   FC.cutoff = 1.2,
-  p.cutoff = 0.05
+  p.cutoff = 0.05,
+  p.adjust = "BH"
 )
 }
 \arguments{
@@ -20,11 +22,17 @@ analyze.DIAPISA(
 
 \item{extract.before}{Regex pattern to extract group names from sample names (before a specific pattern).}
 
+\item{exclude}{Vector of patterns, which will be matched to samples and those will be excluded from the analysis.}
+
 \item{ctrl.name}{Name of the control group (e.g., "Ctrl").}
 
 \item{FC.cutoff}{Fold change cutoff for determining significance (default is 1.2).}
 
 \item{p.cutoff}{Adjusted p-value cutoff for determining significance (default is 0.05).}
+
+\item{p.adjust}{p-value adjustment method in limma::topTable}
+
+\item{PCA.ntop}{Integer. Number of proteins with most variance to by used to perform PCA analysis.}
 }
 \value{
 A named list with the following elements:

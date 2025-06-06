@@ -9,9 +9,12 @@
 #' @param file Path to the DIA-NN `.parquet` report file.
 #' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
 #' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
+#' @param exclude Vector of patterns, which will be matched to samples and those will be excluded from the analysis.
 #' @param ctrl.name Name of the control group (e.g., "Ctrl").
 #' @param FC.cutoff Fold change cutoff for determining significance (default is 1.2).
 #' @param p.cutoff Adjusted p-value cutoff for determining significance (default is 0.05).
+#' @param p.adjust p-value adjustment method in limma::topTable
+#' @param PCA.ntop Integer. Number of proteins with most variance to by used to perform PCA analysis.
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -49,9 +52,11 @@
 analyze.DIAPISA <- function(file,
                             extract.after = "DIA_",
                             extract.before = "_",
+                            exclude=c(),
                             ctrl.name = "Ctrl",
                             FC.cutoff = 1.2,
-                            p.cutoff = 0.05) {
+                            p.cutoff = 0.05,
+                            p.adjust = "BH") {
 
 
   diann_report <- arrow::read_parquet(file) %>%
@@ -68,11 +73,34 @@ analyze.DIAPISA <- function(file,
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
 
-  groups_for_design <- str_extract(colnames(prot_mtx), paste0("(?<=", extract.after, ").*(?=", extract.before, ")"))
+  tmp <- prot_mtx[, 4]
+  prot_mtx[, 4] <- prot_mtx[, 7]
+  prot_mtx[, 7] <- tmp
+
+  prot_mtx_filtered <- prot_mtx[,!str_detect(colnames(prot_mtx),paste(exclude,collapse="|"))]
+  excluded <- ncol(prot_mtx)-ncol(prot_mtx_filtered)
+  if(excluded==1) {
+    cat(paste0("Excluded ",excluded," sample from the analysis."))
+  } else if(excluded>1) {
+    cat(paste0("Excluded ",excluded," samples from the analysis."))
+  }
+
+  #pca analysis
+  pcadata <- prot_mtx_filtered
+  colnames(pcadata) <- str_extract(colnames(prot_mtx_filtered),paste0("(?<=",extract.after,").*"))
+  PCAresult <- DESeq2.pca.analysis(pcadata,PCA.ntop)
+
+  prot_raw <- prot_mtx %>% as.data.frame() %>%
+    rownames_to_column("id")
+
+
+
+
+  groups_for_design <- str_extract(colnames(prot_mtx_filtered), paste0("(?<=", extract.after, ").*(?=", extract.before, ")"))
   design_matrix <- model.matrix(~ 0 + groups_for_design)
   colnames(design_matrix) <- levels(factor(groups_for_design))
 
-  limma_model <- lmFit(log2(prot_mtx), design = design_matrix, method = "ls")
+  limma_model <- lmFit(log2(prot_mtx_filtered), design = design_matrix, method = "ls")
 
   all_groups <- colnames(design_matrix)
   comparisons <- setdiff(all_groups, ctrl.name)
@@ -213,9 +241,11 @@ analyze.DIAPISA <- function(file,
     )
 
   return(list(
+    raw_data = prot_raw,
     all_results = all_results,
     volcano_facet = volcano_facet,
     volcano_list = volcano_list,
-    MD_plot_faceted = MD_plot_faceted
+    MD_plot_faceted = MD_plot_faceted,
+    PCA = PCAresult
   ))
 }

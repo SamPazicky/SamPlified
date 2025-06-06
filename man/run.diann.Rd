@@ -58,7 +58,7 @@ Executes DIA-NN on one or more \code{.mzML} files using system calls.
 }
 \examples{
 \dontrun{
-run_diann(
+run.diann(
   files = list.files("DIA_data", pattern = "\\\\.mzML$", full.names = TRUE),
   output.folder = "DIA_results",
   lib = "library.tsv",
