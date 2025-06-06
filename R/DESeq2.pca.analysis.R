@@ -26,14 +26,6 @@ DESeq2.pca.analysis <- function(
     ntop=10
 ) {
 
-  # Load required package
-  if (!requireNamespace("DESeq2", quietly = TRUE)) {
-    stop("Please install the 'DESeq2' package first.")
-  }
-  library(DESeq2)
-
-  # Match transformation method
-  transformation <- match.arg(transformation)
 
   # Check row/column names
   if (is.null(rownames(protein_matrix)) || is.null(colnames(protein_matrix))) {
