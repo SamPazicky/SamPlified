@@ -14,7 +14,8 @@
 #' @param FC.cutoff Fold change cutoff for determining significance (default is 1.2).
 #' @param p.cutoff Adjusted p-value cutoff for determining significance (default is 0.05).
 #' @param p.adjust p-value adjustment method in limma::topTable
-#' @param PCA.ntop Integer. Number of proteins with most variance to by used to perform PCA analysis.
+#' @param pulses In how many gas fractions were the samples measured?
+#' @param pulse.quant Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -50,22 +51,26 @@
 #' }
 
 analyze.DIAPISA <- function(file,
-                            extract.after = "DIA_",
+                            extract.after = "^",
                             extract.before = "_",
                             exclude=c(),
                             ctrl.name = "Ctrl",
                             FC.cutoff = 1.2,
                             p.cutoff = 0.05,
-                            p.adjust = "BH") {
+                            p.adjust = "BH",
+                            pulses=1,
+                            pulse.quant="prot.max"
+) {
+
 
 
   diann_report <- arrow::read_parquet(file) %>%
     dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
     dplyr::mutate(File.Name = Run) %>%
-    dplyr::filter(str_detect(Protein.Ids, "cRAP", negate = TRUE))
+    dplyr::filter(str_detect(Protein.Ids, "cRAP|Biognosys", negate = TRUE))
 
-  cnt <- count(diann_report, Run) %>% nrow()
-  cat("Analyzing", cnt, "samples...\n")
+  cnt <- max(diann_report$Run.Index)+1
+  cat("Analyzing", cnt/pulses, "samples run in ",pulses," pulses...\n")
 
   prot_mtx <- diann::diann_matrix(diann_report,
                                   id.header = "Protein.Ids",
@@ -73,11 +78,13 @@ analyze.DIAPISA <- function(file,
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
 
-  tmp <- prot_mtx[, 4]
-  prot_mtx[, 4] <- prot_mtx[, 7]
-  prot_mtx[, 7] <- tmp
 
-  prot_mtx_filtered <- prot_mtx[,!str_detect(colnames(prot_mtx),paste(exclude,collapse="|"))]
+  if(!is.null(exclude)) {
+    prot_mtx_filtered <- prot_mtx[,!str_detect(colnames(prot_mtx),paste(exclude,collapse="|"))]
+  } else {
+    prot_mtx_filtered <- prot_mtx
+  }
+
   excluded <- ncol(prot_mtx)-ncol(prot_mtx_filtered)
   if(excluded==1) {
     cat(paste0("Excluded ",excluded," sample from the analysis."))
@@ -85,22 +92,81 @@ analyze.DIAPISA <- function(file,
     cat(paste0("Excluded ",excluded," samples from the analysis."))
   }
 
-  #pca analysis
-  pcadata <- prot_mtx_filtered
-  colnames(pcadata) <- str_extract(colnames(prot_mtx_filtered),paste0("(?<=",extract.after,").*"))
-  PCAresult <- DESeq2.pca.analysis(pcadata,PCA.ntop)
+  #quantifying pulseDIA
+  if(pulses>1) {
+    if(pulse.quant=="prot.max") {
+      prot_mtx_filtered_p <- prot_mtx_filtered %>%
+        as.data.frame() %>%
+        rownames_to_column("id") %>%
+        # setNames(str_extract(names(.), paste0("(?<=",extract.after,").*"))) %>%
+        pivot_longer(
+          cols = !id,
+          names_to = c("pulse", "sample"),
+          names_pattern = ".*_pulseDIA\\d+x(\\d+)_(.+)",
+          values_to = "quant"
+        ) %>%
+        na.omit() %>%
+        group_by(id,sample) %>%
+        dplyr::summarise(quant=max(quant,na.rm=TRUE),.groups="keep") %>%
+        ungroup() %>%
+        pivot_wider(id_cols=id,names_from=sample,values_from=quant) %>%
+        column_to_rownames("id")
+    } else if(pulse.quant=="prot.mean") {
+      prot_mtx_filtered_p <- prot_mtx_filtered %>%
+        as.data.frame() %>%
+        rownames_to_column("id") %>%
+        # setNames(str_extract(names(.), paste0("(?<=",extract.after,").*"))) %>%
+        pivot_longer(
+          cols = !id,
+          names_to = c("pulse", "sample"),
+          names_pattern = ".*_pulseDIA\\d+x(\\d+)_(.+)",
+          values_to = "quant"
+        ) %>%
+        na.omit() %>%
+        group_by(id,sample) %>%
+        dplyr::summarise(quant=mean(quant,na.rm=TRUE),.groups="keep") %>%
+        ungroup() %>%
+        pivot_wider(id_cols=id,names_from=sample,values_from=quant) %>%
+        column_to_rownames("id")
+    } else if(pulse.quant=="pept") {
+      prot_mtx_filtered_p <- diann_report %>%
+        filter(Protein.Group != "") %>%
+        select(Run, Protein.Group, Precursor.Quantity) %>%
+        mutate(Sample = str_remove(Run, "[[:digit:]]x[[:digit:]]")) %>%
+        mutate(Sample = str_extract(Sample, paste0("(?<=", extract.after, ").*"))) %>%
+        group_by(Sample, Protein.Group) %>%
+        summarise(Summed.Quantity = sum(Precursor.Quantity, na.rm = TRUE), .groups = "drop") %>%
+        ungroup() %>%
+        { if (!is.null(exclude)) filter(., !str_detect(Sample, exclude)) else . } %>%
+        pivot_wider(id_cols=Protein.Group,names_from=Sample,values_from=Summed.Quantity) %>%
+        column_to_rownames("Protein.Group")
+    }
 
+  } else {
+    prot_mtx_filtered_p <- prot_mtx_filtered %>%
+      as.data.frame() %>%
+      setNames(str_extract(names(.), paste0("(?<=",extract.after,").*")))
+  }
+
+  prot_mtx_filtered_p <- prot_mtx_filtered_p %>%
+    mutate(
+      temp = Ctrl_1,
+      Ctrl_1 = DSM_1,
+      DSM_1 = temp
+    ) %>%
+    select(-temp)
+
+
+  # raw protein table
   prot_raw <- prot_mtx %>% as.data.frame() %>%
     rownames_to_column("id")
 
 
-
-
-  groups_for_design <- str_extract(colnames(prot_mtx_filtered), paste0("(?<=", extract.after, ").*(?=", extract.before, ")"))
+  groups_for_design <- str_extract(colnames(prot_mtx_filtered_p), paste0(".*(?=", extract.before, ")"))
   design_matrix <- model.matrix(~ 0 + groups_for_design)
   colnames(design_matrix) <- levels(factor(groups_for_design))
 
-  limma_model <- lmFit(log2(prot_mtx_filtered), design = design_matrix, method = "ls")
+  limma_model <- lmFit(log2(prot_mtx_filtered_p), design = design_matrix, method = "ls")
 
   all_groups <- colnames(design_matrix)
   comparisons <- setdiff(all_groups, ctrl.name)
@@ -245,7 +311,6 @@ analyze.DIAPISA <- function(file,
     all_results = all_results,
     volcano_facet = volcano_facet,
     volcano_list = volcano_list,
-    MD_plot_faceted = MD_plot_faceted,
-    PCA = PCAresult
+    MD_plot_faceted = MD_plot_faceted
   ))
 }

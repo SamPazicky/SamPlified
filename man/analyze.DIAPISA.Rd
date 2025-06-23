@@ -6,13 +6,15 @@
 \usage{
 analyze.DIAPISA(
   file,
-  extract.after = "DIA_",
+  extract.after = "^",
   extract.before = "_",
   exclude = c(),
   ctrl.name = "Ctrl",
   FC.cutoff = 1.2,
   p.cutoff = 0.05,
-  p.adjust = "BH"
+  p.adjust = "BH",
+  pulses = 1,
+  pulse.quant = "prot.max"
 )
 }
 \arguments{
@@ -32,7 +34,9 @@ analyze.DIAPISA(
 
 \item{p.adjust}{p-value adjustment method in limma::topTable}
 
-\item{PCA.ntop}{Integer. Number of proteins with most variance to by used to perform PCA analysis.}
+\item{pulses}{In how many gas fractions were the samples measured?}
+
+\item{pulse.quant}{Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.}
 }
 \value{
 A named list with the following elements:
