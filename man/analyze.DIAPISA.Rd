@@ -8,10 +8,12 @@ analyze.DIAPISA(
   file,
   extract.after = "^",
   extract.before = "_",
-  exclude = c(),
   ctrl.name = "Ctrl",
-  FC.cutoff = 1.2,
-  p.cutoff = 0.05,
+  pos.ctrl = "Pyr",
+  pos.ctrl.id = "PF3D7_0417200.1-p1",
+  exclude = pos.ctrl,
+  FC.cutoff = c(1.2, 1.2),
+  p.cutoff = c(0.01, 0.05),
   p.adjust = "BH",
   pulses = 1,
   pulse.quant = "prot.max"
@@ -24,13 +26,17 @@ analyze.DIAPISA(
 
 \item{extract.before}{Regex pattern to extract group names from sample names (before a specific pattern).}
 
-\item{exclude}{Vector of patterns, which will be matched to samples and those will be excluded from the analysis.}
-
 \item{ctrl.name}{Name of the control group (e.g., "Ctrl").}
 
-\item{FC.cutoff}{Fold change cutoff for determining significance (default is 1.2).}
+\item{pos.ctrl}{Regex pattern to extract the positive control sample.}
 
-\item{p.cutoff}{Adjusted p-value cutoff for determining significance (default is 0.05).}
+\item{pos.ctrl.id}{ID of the protein that is the hit in the positive sample.}
+
+\item{exclude}{Vector of patterns, which will be matched to samples and those will be excluded from the analysis.}
+
+\item{FC.cutoff}{Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).}
+
+\item{p.cutoff}{Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).}
 
 \item{p.adjust}{p-value adjustment method in limma::topTable}
 

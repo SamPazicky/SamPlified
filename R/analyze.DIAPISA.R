@@ -9,10 +9,12 @@
 #' @param file Path to the DIA-NN `.parquet` report file.
 #' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
 #' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
-#' @param exclude Vector of patterns, which will be matched to samples and those will be excluded from the analysis.
 #' @param ctrl.name Name of the control group (e.g., "Ctrl").
-#' @param FC.cutoff Fold change cutoff for determining significance (default is 1.2).
-#' @param p.cutoff Adjusted p-value cutoff for determining significance (default is 0.05).
+#' @param pos.ctrl Regex pattern to extract the positive control sample.
+#' @param pos.ctrl.id ID of the protein that is the hit in the positive sample.
+#' @param exclude Vector of patterns, which will be matched to samples and those will be excluded from the analysis.
+#' @param FC.cutoff Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).
+#' @param p.cutoff Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).
 #' @param p.adjust p-value adjustment method in limma::topTable
 #' @param pulses In how many gas fractions were the samples measured?
 #' @param pulse.quant Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.
@@ -53,16 +55,18 @@
 analyze.DIAPISA <- function(file,
                             extract.after = "^",
                             extract.before = "_",
-                            exclude=c(),
                             ctrl.name = "Ctrl",
-                            FC.cutoff = 1.2,
-                            p.cutoff = 0.05,
+                            pos.ctrl="Pyr",
+                            pos.ctrl.id="PF3D7_0417200.1-p1",
+                            exclude=pos.ctrl,
+                            FC.cutoff = c(1.2,1.2),
+                            p.cutoff = c(0.01,0.05),
                             p.adjust = "BH",
                             pulses=1,
                             pulse.quant="prot.max"
 ) {
 
-
+  exclude <- c(pos.ctrl,exclude) %>% unique()
 
   diann_report <- arrow::read_parquet(file) %>%
     dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
@@ -70,7 +74,12 @@ analyze.DIAPISA <- function(file,
     dplyr::filter(str_detect(Protein.Ids, "cRAP|Biognosys", negate = TRUE))
 
   cnt <- max(diann_report$Run.Index)+1
-  cat("Analyzing", cnt/pulses, "samples run in ",pulses," pulses...\n")
+  if(pulses==1) {
+    cat("Analyzing", cnt/pulses, "samples run in DIA mode.\n")
+  } else {
+    cat("Analyzing", cnt/pulses, "samples run in ",pulses," pulses...\n")
+
+  }
 
   prot_mtx <- diann::diann_matrix(diann_report,
                                   id.header = "Protein.Ids",
@@ -78,7 +87,7 @@ analyze.DIAPISA <- function(file,
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
 
-
+  cat(paste0("Detected ",nrow(prot_mtx)," proteins.\n"))
   if(!is.null(exclude)) {
     prot_mtx_filtered <- prot_mtx[,!str_detect(colnames(prot_mtx),paste(exclude,collapse="|"))]
   } else {
@@ -91,6 +100,24 @@ analyze.DIAPISA <- function(file,
   } else if(excluded>1) {
     cat(paste0("Excluded ",excluded," samples from the analysis."))
   }
+
+  sel.score <- prot_mtx[,str_detect(colnames(prot_mtx),paste(c(pos.ctrl.name,ctrl.name),collapse="|"))] %>%
+    as.data.frame() %>%
+    setNames(c(pos.ctrl.name,paste0("Ctrl",1:3))) %>%
+    rownames_to_column("id") %>%
+    pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
+    mutate(group=ifelse(str_detect(condition,"Ctrl"),"Ctrl","Pos.Ctrl")) %>%
+    group_by(id,group) %>%
+    dplyr::summarise(mu=mean(abundance),sd=sd(abundance), .groups="drop") %>%
+    ungroup() %>%
+    pivot_wider(id_cols=id, names_from=group, names_sep="_",values_from=c(mu,sd)) %>%
+    mutate(z=(mu_Pos.Ctrl-mu_Ctrl)/sd_Ctrl) %>%
+    filter(id==pos.ctrl.id) %>%
+    pull(z) %>%
+    round(1)
+
+  cat(paste0("Selection score is ", sel.score,"!\n"))
+  cat("Selection score must be above 2. The higher, the better!\n")
 
   #quantifying pulseDIA
   if(pulses>1) {
@@ -186,23 +213,36 @@ analyze.DIAPISA <- function(file,
       dplyr::mutate(Contrast = contrast)
   }) %>%
     dplyr::mutate(status = case_when(
-      logFC > log2(FC.cutoff) & adj.P.Val <= p.cutoff ~ "Stabilized",
-      logFC < -log2(FC.cutoff) & adj.P.Val <= p.cutoff ~ "Destabilized",
+      logFC > log2(max(FC.cutoff)) & adj.P.Val <= max(p.cutoff) ~ "Stabilized",
+      logFC < -log2(max(FC.cutoff)) & adj.P.Val <= max(p.cutoff) ~ "Destabilized",
       TRUE ~ "Not significant"),
       status = factor(status, levels = c("Destabilized", "Not significant", "Stabilized"))
-    )
+    ) %>%
+    dplyr::mutate(hit = case_when(
+      abs(logFC) > log2(FC.cutoff[1]) & adj.P.Val <= p.cutoff[1] ~ "Hit",
+      abs(logFC) > log2(FC.cutoff[2]) & adj.P.Val <= p.cutoff[2] ~ "Candidate",
+            TRUE ~ ""),
+      hit = factor(hit, levels = c("Hit", "Candidate", ""))
+    ) %>%
+    dplyr::mutate(label = case_when(
+      hit != "" ~ paste(hit, status, sep = " - "),
+      TRUE ~ status
+    ))
 
   max_logfc <- ceiling(max(abs(all_results$logFC), na.rm = TRUE))
 
-  volcano_facet <- ggplot(all_results, aes(x = logFC, y = -log10(adj.P.Val), color = status)) +
-    geom_point(aes(alpha = status)) +
+  volcano_facet <- ggplot(all_results, aes(x = logFC, y = -log10(adj.P.Val))) +
+    geom_point(aes(alpha = status, color = label)) +
     scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3)) +
     geom_hline(yintercept = -log10(p.cutoff), linetype = "dashed", color = "black") +
     geom_vline(xintercept = c(-log2(FC.cutoff), log2(FC.cutoff)), linetype = "dashed", color = "black") +
     facet_wrap(~ Contrast) +
-    scale_color_manual(values = c("Destabilized" = "steelblue",
+    scale_color_manual(values = c("Candidate - Destabilized" = "steelblue2",
                                   "Not significant" = "grey",
-                                  "Stabilized" = "firebrick")) +
+                                  "Hit - Destabilized" = "steelblue4",
+                                  "Hit - Stabilized" = "firebrick",
+                                  "Candidate - Stabilized" = "firebrick2"),
+                       drop=TRUE) +
     labs(title = "Volcano plots of limma contrasts",
          x = "log2(Stability Fold Change)",
          y = "-log10(p-value)") +
@@ -302,6 +342,7 @@ analyze.DIAPISA <- function(file,
     all_results = all_results,
     volcano_facet = volcano_facet,
     volcano_list = volcano_list,
-    MD_plot_faceted = MD_plot_faceted
+    MD_plot_faceted = MD_plot_faceted,
+    sel.score = sel.score
   ))
 }
