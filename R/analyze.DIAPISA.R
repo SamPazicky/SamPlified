@@ -148,15 +148,6 @@ analyze.DIAPISA <- function(file,
       setNames(str_extract(names(.), paste0("(?<=",extract.after,").*")))
   }
 
-  prot_mtx_filtered_p <- prot_mtx_filtered_p %>%
-    mutate(
-      temp = Ctrl_1,
-      Ctrl_1 = DSM_1,
-      DSM_1 = temp
-    ) %>%
-    select(-temp)
-
-
   # raw protein table
   prot_raw <- prot_mtx %>% as.data.frame() %>%
     rownames_to_column("id")
