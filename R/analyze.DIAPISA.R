@@ -86,8 +86,8 @@ analyze.DIAPISA <- function(file,
                                   quantity.header = "Genes.MaxLFQ.Unique",
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
-
-  cat(paste0("Detected ",nrow(prot_mtx)," proteins.\n"))
+  no.pro <- nrow(prot_mtx)
+  cat(paste0("Detected ",no.pro," proteins.\n"))
   if(!is.null(exclude)) {
     prot_mtx_filtered <- prot_mtx[,!str_detect(colnames(prot_mtx),paste(exclude,collapse="|"))]
   } else {
@@ -196,7 +196,7 @@ analyze.DIAPISA <- function(file,
 
   contrast_matrix <- makeContrasts(
     contrasts = unlist(contrast_formulae),
-    levels = all_groups
+    levels = design_matrix
   )
 
   estimated_coef <- contrasts.fit(limma_model, contrast_matrix)
@@ -226,14 +226,15 @@ analyze.DIAPISA <- function(file,
     ) %>%
     dplyr::mutate(label = case_when(
       hit != "" ~ paste(hit, status, sep = " - "),
-      TRUE ~ status
-    ))
+      TRUE ~ status),
+      label=as.character(label)
+      )
 
   max_logfc <- ceiling(max(abs(all_results$logFC), na.rm = TRUE))
 
   volcano_facet <- ggplot(all_results, aes(x = logFC, y = -log10(adj.P.Val))) +
-    geom_point(aes(alpha = status, color = label)) +
-    scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3)) +
+    geom_point(aes(alpha = label, color = label), show.legend = c(alpha = FALSE)) +
+    scale_alpha_manual(values = c("Destabilized" = 1, "Stabilized" = 1, "Not significant" = 0.3), drop=TRUE) +
     geom_hline(yintercept = -log10(p.cutoff), linetype = "dashed", color = "black") +
     geom_vline(xintercept = c(-log2(FC.cutoff), log2(FC.cutoff)), linetype = "dashed", color = "black") +
     facet_wrap(~ Contrast) +
