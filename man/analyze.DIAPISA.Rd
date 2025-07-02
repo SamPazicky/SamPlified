@@ -11,7 +11,7 @@ analyze.DIAPISA(
   ctrl.name = "Ctrl",
   pos.ctrl.name = NA,
   pos.ctrl.id = "PF3D7_0417200.1-p1",
-  exclude = pos.ctrl,
+  exclude = pos.ctrl.name,
   FC.cutoff = c(1.2, 1.2),
   p.cutoff = c(0.01, 0.05),
   p.adjust = "BH",
