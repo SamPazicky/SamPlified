@@ -66,7 +66,7 @@ analyze.DIAPISA <- function(file,
                             pulse.quant="prot.max"
 ) {
 
-  exclude <- c(pos.ctrl,exclude) %>% unique()
+  exclude <- c(pos.ctrl.name,exclude) %>% unique()
 
   diann_report <- arrow::read_parquet(file) %>%
     dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
