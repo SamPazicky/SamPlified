@@ -10,7 +10,7 @@
 #' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
 #' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
 #' @param ctrl.name Name of the control group (e.g., "Ctrl").
-#' @param pos.ctrl Regex pattern to extract the positive control sample.
+#' @param pos.ctrl.name Regex pattern to extract the positive control sample.
 #' @param pos.ctrl.id ID of the protein that is the hit in the positive sample.
 #' @param exclude Vector of patterns, which will be matched to samples and those will be excluded from the analysis.
 #' @param FC.cutoff Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).
@@ -56,7 +56,7 @@ analyze.DIAPISA <- function(file,
                             extract.after = "^",
                             extract.before = "_",
                             ctrl.name = "Ctrl",
-                            pos.ctrl="Pyr",
+                            pos.ctrl.name=NA,
                             pos.ctrl.id="PF3D7_0417200.1-p1",
                             exclude=pos.ctrl,
                             FC.cutoff = c(1.2,1.2),
@@ -101,20 +101,25 @@ analyze.DIAPISA <- function(file,
     cat(paste0("Excluded ",excluded," samples from the analysis."))
   }
 
-  sel.score <- prot_mtx[,str_detect(colnames(prot_mtx),paste(c(pos.ctrl.name,ctrl.name),collapse="|"))] %>%
-    as.data.frame() %>%
-    setNames(c(pos.ctrl.name,paste0("Ctrl",1:3))) %>%
-    rownames_to_column("id") %>%
-    pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
-    mutate(group=ifelse(str_detect(condition,"Ctrl"),"Ctrl","Pos.Ctrl")) %>%
-    group_by(id,group) %>%
-    dplyr::summarise(mu=mean(abundance),sd=sd(abundance), .groups="drop") %>%
-    ungroup() %>%
-    pivot_wider(id_cols=id, names_from=group, names_sep="_",values_from=c(mu,sd)) %>%
-    mutate(z=(mu_Pos.Ctrl-mu_Ctrl)/sd_Ctrl) %>%
-    filter(id==pos.ctrl.id) %>%
-    pull(z) %>%
-    round(1)
+  if(!is.na(pos.ctrl.name)) {
+    sel.score <- prot_mtx[,str_detect(colnames(prot_mtx),paste(c(pos.ctrl.name,ctrl.name),collapse="|"))] %>%
+      as.data.frame() %>%
+      setNames(c(pos.ctrl.name,paste0("Ctrl",1:3))) %>%
+      rownames_to_column("id") %>%
+      pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
+      mutate(group=ifelse(str_detect(condition,"Ctrl"),"Ctrl","Pos.Ctrl")) %>%
+      group_by(id,group) %>%
+      dplyr::summarise(mu=mean(abundance),sd=sd(abundance), .groups="drop") %>%
+      ungroup() %>%
+      pivot_wider(id_cols=id, names_from=group, names_sep="_",values_from=c(mu,sd)) %>%
+      mutate(z=(mu_Pos.Ctrl-mu_Ctrl)/sd_Ctrl) %>%
+      filter(id==pos.ctrl.id) %>%
+      pull(z) %>%
+      round(1)
+  } else {
+    sel.score <- NA
+  }
+
 
   cat(paste0("Selection score is ", sel.score,"!\n"))
   cat("Selection score must be above 2. The higher, the better!\n")

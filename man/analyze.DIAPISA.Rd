@@ -9,7 +9,7 @@ analyze.DIAPISA(
   extract.after = "^",
   extract.before = "_",
   ctrl.name = "Ctrl",
-  pos.ctrl = "Pyr",
+  pos.ctrl.name = NA,
   pos.ctrl.id = "PF3D7_0417200.1-p1",
   exclude = pos.ctrl,
   FC.cutoff = c(1.2, 1.2),
@@ -28,7 +28,7 @@ analyze.DIAPISA(
 
 \item{ctrl.name}{Name of the control group (e.g., "Ctrl").}
 
-\item{pos.ctrl}{Regex pattern to extract the positive control sample.}
+\item{pos.ctrl.name}{Regex pattern to extract the positive control sample.}
 
 \item{pos.ctrl.id}{ID of the protein that is the hit in the positive sample.}
 
