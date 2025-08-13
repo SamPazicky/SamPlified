@@ -16,7 +16,8 @@ analyze.DIAPISA(
   p.cutoff = c(0.01, 0.05),
   p.adjust = "BH",
   pulses = 1,
-  pulse.quant = "prot.max"
+  pulse.quant = "prot.max",
+  report.quant.col = "Genes.MaxLFQ.Unique"
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ analyze.DIAPISA(
 \item{pulses}{In how many gas fractions were the samples measured?}
 
 \item{pulse.quant}{Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.}
+
+\item{report.quant.col}{Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ}
 }
 \value{
 A named list with the following elements:

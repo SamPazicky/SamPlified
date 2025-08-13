@@ -18,6 +18,7 @@
 #' @param p.adjust p-value adjustment method in limma::topTable
 #' @param pulses In how many gas fractions were the samples measured?
 #' @param pulse.quant Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.
+#' @param report.quant.col Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -63,7 +64,8 @@ analyze.DIAPISA <- function(file,
                             p.cutoff = c(0.01,0.05),
                             p.adjust = "BH",
                             pulses=1,
-                            pulse.quant="prot.max"
+                            pulse.quant="prot.max",
+                            report.quant.col="Genes.MaxLFQ.Unique" # PG.MaxLFQ
 ) {
 
   exclude <- c(pos.ctrl.name,exclude) %>% unique()
@@ -83,7 +85,7 @@ analyze.DIAPISA <- function(file,
 
   prot_mtx <- diann::diann_matrix(diann_report,
                                   id.header = "Protein.Ids",
-                                  quantity.header = "Genes.MaxLFQ.Unique",
+                                  quantity.header = report.quant.col,
                                   proteotypic.only = TRUE,
                                   pg.q = 0.01)
   no.pro <- nrow(prot_mtx)
