@@ -106,6 +106,7 @@ analyze.DIAPISA <- function(file,
   if(!is.na(pos.ctrl.name)) {
     sel.score <- prot_mtx[,str_detect(colnames(prot_mtx),paste(c(pos.ctrl.name,ctrl.name),collapse="|"))] %>%
       as.data.frame() %>%
+      dplyr::select(contains(pos.ctrl.name),contains(ctrl.name)) %>%
       setNames(c(pos.ctrl.name,paste0("Ctrl",1:3))) %>%
       rownames_to_column("id") %>%
       pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
