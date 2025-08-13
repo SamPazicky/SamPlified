@@ -15,6 +15,7 @@ analyze.DIAPISA(
   FC.cutoff = c(1.2, 1.2),
   p.cutoff = c(0.01, 0.05),
   p.adjust = "BH",
+  compare.to.all = FALSE,
   pulses = 1,
   pulse.quant = "prot.max",
   report.quant.col = "Genes.MaxLFQ.Unique"
@@ -40,6 +41,8 @@ analyze.DIAPISA(
 \item{p.cutoff}{Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).}
 
 \item{p.adjust}{p-value adjustment method in limma::topTable}
+
+\item{compare.to.all}{If TRUE, one treatment will be compared not only to the control sample but to all other treatment groups. Default is FALSE.}
 
 \item{pulses}{In how many gas fractions were the samples measured?}
 

@@ -16,6 +16,7 @@
 #' @param FC.cutoff Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).
 #' @param p.cutoff Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).
 #' @param p.adjust p-value adjustment method in limma::topTable
+#' @param compare.to.all If TRUE, one treatment will be compared not only to the control sample but to all other treatment groups. Default is FALSE.
 #' @param pulses In how many gas fractions were the samples measured?
 #' @param pulse.quant Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.
 #' @param report.quant.col Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ
@@ -63,6 +64,7 @@ analyze.DIAPISA <- function(file,
                             FC.cutoff = c(1.2,1.2),
                             p.cutoff = c(0.01,0.05),
                             p.adjust = "BH",
+                            compare.to.all=FALSE,
                             pulses=1,
                             pulse.quant="prot.max",
                             report.quant.col="Genes.MaxLFQ.Unique" # PG.MaxLFQ
@@ -192,7 +194,9 @@ analyze.DIAPISA <- function(file,
   design_matrix <- model.matrix(~ 0 + groups_for_design)
   colnames(design_matrix) <- levels(factor(groups_for_design))
 
-  limma_model <- lmFit(log2(prot_mtx_filtered_p), design = design_matrix, method = "ls")
+  prot_mtx_filtered_p_log <- prot_mtx_filtered_p %>% as.matrix() %>% vsn::justvsn() %>% as.data.frame()
+
+  limma_model <- lmFit(prot_mtx_filtered_p_log, design = design_matrix, method = "ls")
 
   all_groups <- colnames(design_matrix)
   comparisons <- setdiff(all_groups, ctrl.name)
@@ -206,6 +210,10 @@ analyze.DIAPISA <- function(file,
     contrasts = unlist(contrast_formulae),
     levels = design_matrix
   )
+
+  if(compare.to.all) {
+    contrast_matrix[contrast_matrix == 0|contrast_matrix==-1] <- -1/ncol(contrast_matrix)
+  }
 
   estimated_coef <- contrasts.fit(limma_model, contrast_matrix)
   empirical_Bayes_fit <- eBayes(estimated_coef)
