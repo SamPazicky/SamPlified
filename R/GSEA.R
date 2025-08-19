@@ -4,8 +4,8 @@
 #'
 #' @param pathways Data frame with columns 'id','pathway.type' and 'pathway.name', or at least a
 #' data frame with three columns and this content.
-#' @param labels.col ranks Data frame with columns 'id' and 'rank', or at least a data frame with
-#' two columns and this content
+#' @param ranks Data fram with two columns 'id' and 'rank' or at least a data frame with two columns and this content.
+#' @param collapse Logical. Should the pathways be collapse to simplify the output? Default is TRUE.
 #' @param types Vector: what types of enrichment to do? Choose from pathway.type of pathways or simply "all".
 #' @param minsize minimal size of gene set to test.
 #' @param maxsize maximal size of gene set to test.
@@ -27,6 +27,7 @@ GSEA <- function (
   pathways=data.frame(), # data frame with three columns in this order: ids, pathway type, pathway name
   ranks=data.frame(), # data frame with names "id" and "rank"
   types="all",
+  collapse=TRUE,
   minsize=5,
   maxsize=200,
   p.cutoff=0.05,
@@ -83,20 +84,35 @@ GSEA <- function (
   if(nrow(GSEA_enriched_table)==0) {
     return(list(enrichment.table=NULL,enriched.table=NULL,plot=NULL,enrichment.plot=NULL))
   }
-  # collapse
-  collapsedPathways <- collapsePathways(GSEA_enriched_table, reduce(pathwaylist,append), ranking)
 
-  # Convert mainPathways to a data frame and add a column with daughter pathways,
-  # then join the entire GSEA table with all statistics
-  mainPathways <- data.frame(collapsedPathways$parentPathways) %>%
-    setNames("pathway") %>% rownames_to_column("daughter") %>%
-    mutate(pathway=ifelse(is.na(pathway),daughter,pathway)) %>%
-    group_by(pathway) %>% summarise(corresponding_pathways=paste(daughter,collapse=";;")) %>% ungroup() %>%
-    mutate(corresponding_pathways=paste0(pathway,";;",corresponding_pathways)) %>%
-    left_join(GSEA_enriched_table)
+  if(collapse) {
+    # collapse
+    collapsedPathways <- collapsePathways(GSEA_enriched_table, reduce(pathwaylist,append), ranking)
+
+    # Convert mainPathways to a data frame and add a column with daughter pathways,
+    # then join the entire GSEA table with all statistics
+    mainPathways <- data.frame(collapsedPathways$parentPathways) %>%
+      setNames("pathway") %>% rownames_to_column("daughter") %>%
+      mutate(pathway=ifelse(is.na(pathway),daughter,pathway)) %>%
+      group_by(pathway) %>% summarise(corresponding_pathways=paste(daughter,collapse=";;")) %>% ungroup() %>%
+      mutate(corresponding_pathways=paste0(pathway,";;",corresponding_pathways)) %>%
+      left_join(GSEA_enriched_table)
+    named_pathwaylist <- mainPathways %>%
+      separate_longer_delim(corresponding_pathways,";;") %>%
+      left_join(reduce(pathwaylist,append)%>%stack%>%setNames(c("protein","corresponding_pathways"))%>%distinct(),relationship="many-to-many") %>%
+      dplyr::select(protein,pathway.name) %>%
+      unstack()
+  } else {
+    mainPathways <- GSEA_enriched_table
+    named_pathwaylist <- mainPathways %>%
+      left_join(reduce(pathwaylist,append)%>%stack%>%setNames(c("protein","pathway"))%>%distinct(),relationship="many-to-many") %>%
+      dplyr::select(protein,pathway.name) %>%
+      unstack()
+  }
 
   # plots
-  named_pathwaylist <- reduce(pathwaylist,append)[mainPathways$pathway] %>% setNames(mainPathways$pathway.name)
+
+  # named_pathwaylist <- reduce(pathwaylist,append)[mainPathways$pathway] %>% setNames(mainPathways$pathway.name)
   plotPathways <- mainPathways %>% dplyr::select(!pathway) %>% mutate(pathway=pathway.name)
   plot <- plotGseaTable(named_pathwaylist, ranking, plotPathways,
                 gseaParam=0.5)

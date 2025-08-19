@@ -8,6 +8,7 @@ GSEA(
   pathways = data.frame(),
   ranks = data.frame(),
   types = "all",
+  collapse = TRUE,
   minsize = 5,
   maxsize = 200,
   p.cutoff = 0.05,
@@ -18,7 +19,11 @@ GSEA(
 \item{pathways}{Data frame with columns 'id','pathway.type' and 'pathway.name', or at least a
 data frame with three columns and this content.}
 
+\item{ranks}{Data fram with two columns 'id' and 'rank' or at least a data frame with two columns and this content.}
+
 \item{types}{Vector: what types of enrichment to do? Choose from pathway.type of pathways or simply "all".}
+
+\item{collapse}{Logical. Should the pathways be collapse to simplify the output? Default is TRUE.}
 
 \item{minsize}{minimal size of gene set to test.}
 
@@ -27,9 +32,6 @@ data frame with three columns and this content.}
 \item{p.cutoff}{Numeric: p-value cutoff. Default is 0.05.}
 
 \item{scoreType}{Same as in fgseaSimple.}
-
-\item{labels.col}{ranks Data frame with columns 'id' and 'rank', or at least a data frame with
-two columns and this content}
 }
 \value{
 A list with four elements:
