@@ -20,6 +20,8 @@
 #' @param pulses In how many gas fractions were the samples measured?
 #' @param pulse.quant Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.
 #' @param report.quant.col Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ
+#' @param export.xic Logical. Should the XIC of the hit proteins be plotted? This takes additional time (5-10s per hit).
+#' @param xic.folder Folder in which the `xic.parquet` files are saved.
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -67,7 +69,9 @@ analyze.DIAPISA <- function(file,
                             compare.to.all=FALSE,
                             pulses=1,
                             pulse.quant="prot.max",
-                            report.quant.col="Genes.MaxLFQ.Unique" # PG.MaxLFQ
+                            report.quant.col="Genes.MaxLFQ.Unique",
+                            export.xic=FALSE,
+                            xic.folder="report_xic"
 ) {
 
   exclude <- c(pos.ctrl.name,exclude) %>% unique()
@@ -354,12 +358,147 @@ analyze.DIAPISA <- function(file,
       axis.title = element_text(face = "bold")
     )
 
+  allhits <- all_results %>% filter(hit %in% c("Hit","Candidate")) %>% pull(Protein.Ids)
+  rawhits <- prot_mtx_filtered_p_log %>%
+    rownames_to_column("id") %>%
+    filter(id %in% allhits) %>%
+    pivot_longer(cols=!id,names_to="samplerep",values_to="Abundance") %>%
+    filter(!samplerep %in% exclude) %>%
+    separate_wider_delim(samplerep,extract.before,names=c("Sample","Replicate")) %>%
+    group_by(id,Sample) %>%
+    dplyr::mutate(meanAbundance=mean(Abundance,na.omit=TRUE)) %>%
+    ungroup() %>%
+    group_by(id) %>%
+    mutate(
+      relAbundance = Abundance / mean(meanAbundance[Sample == ctrl.name],na.rm=TRUE)
+    ) %>%
+    ungroup()
+  barplots <- list()
+
+  barplots <- rawhits %>%
+    # filter(Sample!=ctrl.name) %>%
+    group_by(id,Sample) %>%
+    mutate(meanrelAbundance=mean(relAbundance,na.rm=TRUE)) %>%
+    ungroup() %>%
+    split(.$id) %>%
+    lapply(function(df) {
+      df$Sample <- fct_relevel(df$Sample, ctrl.name)
+      ggplot(df) +
+        geom_bar(data=.%>%distinct(Sample,meanrelAbundance,.keep_all=TRUE),
+                 aes(x=Sample,y=meanrelAbundance,na.rm=TRUE),
+                 width=0.8, stat="identity",color="black",fill="gray90") +
+        geom_jitter(aes(x=Sample,y=relAbundance,color=Replicate),width=0.15,size=2) +
+        scale_y_continuous(expand=c(0,0),
+                           limits=c(0,max(rawhits$relAbundance, na.rm=TRUE)+0.1)
+        ) +
+        ggtitle(unique(df$id)) +
+        theme_bw() +
+        theme(legend.position="none",
+              plot.title=element_text(hjust=0.5))
+    })
+
+  #XIC charts
+  #xic.folder = "report_xic"
+  if(export.xic) {
+    hitdata <- list()
+    for(x in list.files(xic.folder)) {
+      xicreport <- read_parquet(paste0(xic.folder,"/",x))
+      samp <- str_remove(x,"\\.xic\\.parquet")
+
+      hitdata[[samp]] <- diann_report %>%
+        as.data.frame() %>%
+        dplyr::select(Protein.Ids,Precursor.Id) %>%
+        filter(Protein.Ids %in% allhits) %>%
+        setNames(c("id","pr")) %>%
+        distinct(.keep_all=TRUE) %>%
+        right_join(xicreport,by="pr") %>%
+        na.omit()
+    }
+    hitdata <- hitdata %>%
+      rbindlist(idcol="sample") %>%
+      filter(feature!="index") %>%
+      group_by(id, sample, pr, feature) %>%
+      arrange(rt, .by_group = TRUE) %>%
+      mutate(
+        # index for row-based window
+        idx = row_number(),
+        # mark rows with value > 1e3
+        hit = value > 1e3,
+        # row index of "max value" within the group
+        idx_max = which.max(value),
+        rt_max  = rt[idx_max],
+        # define row-based window (±3 rows)
+        keep_rows = idx %in% unlist(lapply(which(hit), function(i) (i-3):(i+3))),
+        # define rt-based window (±2.5 around rt_max)
+        keep_rt   = abs(rt - rt_max) <= 2.5,
+        # combine conditions
+        keep = keep_rows | keep_rt
+      ) %>%
+      filter(keep) %>%
+      select(-hit, -idx, -idx_max, -rt_max, -keep_rows, -keep_rt, -keep) %>%
+      ungroup() %>%
+      mutate(feature=str_remove(feature,"-unknown")) %>%
+      mutate(sample=str_extract(sample,paste0("(?<=",extract.after,").*")))
+
+
+    samples <- unique(hitdata$sample)
+    top_strip <- hitdata %>%
+      distinct(sample) %>%                 # get unique samples
+      ggplot(aes(x = sample, y = 1, label = sample)) +
+      geom_text(size = 4) +                # facet strip labels
+      theme_void() +                       # remove axes and background
+      theme(
+        plot.margin = margin(0, 0, 0, 0),
+        panel.spacing = unit(0, "cm")
+      )
+
+    features <- unique(hitdata$feature)
+    fcolors <- rainbow(length(features)) %>% setNames(features)
+
+    dir.create("XICs",showWarnings = FALSE)
+    for(hid in unique(hitdata$id)) {
+      c.hitdata <- hitdata %>%
+        filter(id==hid) %>%
+        complete(pr, sample, feature, fill = list(value = NA, rt = NA))
+      prs <- unique(c.hitdata$pr) %>% length()
+      hitplots <- c.hitdata %>%
+        split(.$pr) %>%
+        lapply(function(x) {
+          pr_label <- unique(x$pr)
+          ggplot(x, aes(x = rt, y = value, color = feature)) +
+            geom_point(size=1) +
+            geom_line(aes(group = feature), linewidth=0.1) +
+            facet_wrap(~ sample, nrow = 1, drop=FALSE) +
+            scale_color_manual(values = fcolors) +
+            labs(title = pr_label) +
+            theme_bw() +
+            theme(
+              legend.position = "none",
+              strip.text = element_blank(),        # remove the text
+              strip.background = element_blank(),   # remove the background
+              plot.title = element_text(size = 8),
+              panel.grid.major=element_line(linewidth=0.2),
+              panel.grid.minor=element_line(linewidth=0.1),
+              axis.text.y=element_text(size=6),
+              axis.text.x=element_text(size=6,angle=90,hjust=0,vjust=0.5),
+              axis.title=element_blank()
+            )
+        })
+      hitplot <- patchwork::wrap_plots(hitplots,ncol=1)
+      hitplot <- top_strip/hitplot + plot_layout(heights=c(0.3,prs))
+
+      ggsave(paste0("XICs/",hid,".pdf"),hitplot,width=2*length(samples), height=4*prs,units="cm")
+    }
+  }
+
+
   return(list(
     raw_data = prot_raw,
     all_results = all_results,
     volcano_facet = volcano_facet,
     volcano_list = volcano_list,
     MD_plot_faceted = MD_plot_faceted,
-    sel.score = sel.score
+    sel.score = sel.score,
+    raw.bar.plots = barplots
   ))
 }

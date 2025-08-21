@@ -18,7 +18,9 @@ analyze.DIAPISA(
   compare.to.all = FALSE,
   pulses = 1,
   pulse.quant = "prot.max",
-  report.quant.col = "Genes.MaxLFQ.Unique"
+  report.quant.col = "Genes.MaxLFQ.Unique",
+  export.xic = FALSE,
+  xic.folder = "report_xic"
 )
 }
 \arguments{
@@ -49,6 +51,10 @@ analyze.DIAPISA(
 \item{pulse.quant}{Quantification method for GPF. "pept" is based on maximum peptide intensity, "prot.max" maximum protein intensity and "prot.mean" mean protein intensity.}
 
 \item{report.quant.col}{Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ}
+
+\item{export.xic}{Logical. Should the XIC of the hit proteins be plotted? This takes additional time (5-10s per hit).}
+
+\item{xic.folder}{Folder in which the \code{xic.parquet} files are saved.}
 }
 \value{
 A named list with the following elements:
