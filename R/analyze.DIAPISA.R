@@ -114,10 +114,10 @@ analyze.DIAPISA <- function(file,
       dplyr::select(Accession, contains("Abundances")) %>%
       dplyr::select(!contains("CV",ignore.case=FALSE)) %>%
       column_to_rownames("Accession")
-    if(ncol(prot_mtx)==length(TMT_labels)) {
-      prot_mtx <- prot_mtx %>% setNames(TMT_labels)
+    if(ncol(prot_mtx)==length(TMT.labels)) {
+      prot_mtx <- prot_mtx %>% setNames(TMT.labels)
     } else {
-      stop("There are more samples than names given in TMT_labels argument!")
+      stop("There are more samples than names given in TMT.labels argument!")
     }
   }
 
