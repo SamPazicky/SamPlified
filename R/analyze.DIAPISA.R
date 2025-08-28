@@ -6,7 +6,7 @@
 #' The implementation is heavily inspired by code from the limma-for-proteomics
 #' GitHub repository: \url{https://github.com/41ison/limma-for-proteomics}
 #'
-#' @param file Path to the DIA-NN `.parquet` report file.
+#' @param file Path to the DIA-NN `.parquet` report file for DIA data or to PD-exported txt file for DDA.
 #' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
 #' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
 #' @param ctrl.name Name of the control group (e.g., "Ctrl").
@@ -22,6 +22,8 @@
 #' @param report.quant.col Column in the report that contains quantification values. Either Genes.MaxLFQ.Unique or PG.MaxLFQ
 #' @param export.xic Logical. Should the XIC of the hit proteins be plotted? This takes additional time (5-10s per hit).
 #' @param xic.folder Folder in which the `xic.parquet` files are saved.
+#' @param acq Acqusition mode. DIA or DDA?
+#' @param TMT.labels String vector of TMT-labelled samples names in the same order as in the data file.
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -71,29 +73,55 @@ analyze.DIAPISA <- function(file,
                             pulse.quant="prot.max",
                             report.quant.col="Genes.MaxLFQ.Unique",
                             export.xic=FALSE,
-                            xic.folder="report_xic"
+                            xic.folder="report_xic",
+                            acq="DIA",
+                            TMT.labels=NA
 ) {
+
+  if(acq=="DDA") {
+    pulses=1
+    export.xic=FALSE
+    if(is.na(TMT.labels[1])) {
+      stop("TMT.labels must not be NA if acq is DDA.")
+    }
+  } else if(acq!="DIA") {
+    stop("acq can only be either DDA or DIA!")
+  }
 
   exclude <- c(pos.ctrl.name,exclude) %>% unique()
 
-  diann_report <- arrow::read_parquet(file) %>%
-    dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
-    dplyr::mutate(File.Name = Run) %>%
-    dplyr::filter(str_detect(Protein.Ids, "cRAP|Biognosys", negate = TRUE))
+  if(acq=="DIA") {
+    diann_report <- arrow::read_parquet(file) %>%
+      dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
+      dplyr::mutate(File.Name = Run) %>%
+      dplyr::filter(str_detect(Protein.Ids, "cRAP|Biognosys", negate = TRUE))
 
-  cnt <- max(diann_report$Run.Index)+1
-  if(pulses==1) {
-    cat("Analyzing", cnt/pulses, "samples run in DIA mode.\n")
-  } else {
-    cat("Analyzing", cnt/pulses, "samples run in ",pulses," pulses...\n")
+    cnt <- max(diann_report$Run.Index)+1
+    if(pulses==1) {
+      cat("Analyzing", cnt/pulses, "samples run in DIA mode.\n")
+    } else {
+      cat("Analyzing", cnt/pulses, "samples run in ",pulses," pulses...\n")
 
+    }
+
+    prot_mtx <- diann::diann_matrix(diann_report,
+                                    id.header = "Protein.Ids",
+                                    quantity.header = report.quant.col,
+                                    proteotypic.only = TRUE,
+                                    pg.q = 0.01)
+  } else if(acq=="DDA") {
+    prot_mtx <- fread(file) %>%
+      dplyr::select(Accession, contains("Abundances")) %>%
+      dplyr::select(!contains("CV",ignore.case=FALSE)) %>%
+      column_to_rownames("Accession")
+    if(ncol(prot_mtx)==length(TMT_labels)) {
+      prot_mtx <- prot_mtx %>% setNames(TMT_labels)
+    } else {
+      stop("There are more samples than names given in TMT_labels argument!")
+    }
   }
 
-  prot_mtx <- diann::diann_matrix(diann_report,
-                                  id.header = "Protein.Ids",
-                                  quantity.header = report.quant.col,
-                                  proteotypic.only = TRUE,
-                                  pg.q = 0.01)
+
   no.pro <- nrow(prot_mtx)
   cat(paste0("Detected ",no.pro," proteins.\n"))
   if(!is.null(exclude)) {

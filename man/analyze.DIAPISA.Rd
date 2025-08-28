@@ -20,11 +20,13 @@ analyze.DIAPISA(
   pulse.quant = "prot.max",
   report.quant.col = "Genes.MaxLFQ.Unique",
   export.xic = FALSE,
-  xic.folder = "report_xic"
+  xic.folder = "report_xic",
+  acq = "DIA",
+  TMT.labels = NA
 )
 }
 \arguments{
-\item{file}{Path to the DIA-NN \code{.parquet} report file.}
+\item{file}{Path to the DIA-NN \code{.parquet} report file for DIA data or to PD-exported txt file for DDA.}
 
 \item{extract.after}{Regex pattern to extract group names from sample names (after a specific pattern).}
 
@@ -55,6 +57,10 @@ analyze.DIAPISA(
 \item{export.xic}{Logical. Should the XIC of the hit proteins be plotted? This takes additional time (5-10s per hit).}
 
 \item{xic.folder}{Folder in which the \code{xic.parquet} files are saved.}
+
+\item{acq}{Acqusition mode. DIA or DDA?}
+
+\item{TMT.labels}{String vector of TMT-labelled samples names in the same order as in the data file.}
 }
 \value{
 A named list with the following elements:
