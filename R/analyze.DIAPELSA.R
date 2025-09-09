@@ -14,7 +14,25 @@
 #' @param p.cutoff Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).
 #' @param p.adjust p-value adjustment method in limma::topTable
 
-
+#' @importFrom diann diann_matrix
+#' @importFrom arrow read_parquet
+#' @importFrom dplyr distinct filter select mutate %>% sym
+#' @importFrom stringr str_split
+#' @importFrom tidyr separate
+#' @importFrom purrr map
+#' @import limma
+#' @importFrom ggrepel geom_text_repel
+#'
+#' @return A named list with the following elements:
+#' \describe{
+#'   \item{all_results}{A data frame of differential analysis results.}
+#'   \item{volcano_facet}{A `ggplot` object showing faceted volcano plots.}
+#'   \item{volcano_list}{A named list of individual volcano plots per contrast.}
+#'   \item{MD_plot_faceted}{A `ggplot` object showing faceted MD plots.}
+#' }
+#'
+#' @export
+#'
 analyze.DIAPELSA <- function(file,
                             extract.after = "^",
                             extract.before = "_",

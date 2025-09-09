@@ -29,6 +29,15 @@ analyze.DIAPELSA(
 
 \item{p.adjust}{p-value adjustment method in limma::topTable}
 }
+\value{
+A named list with the following elements:
+\describe{
+\item{all_results}{A data frame of differential analysis results.}
+\item{volcano_facet}{A \code{ggplot} object showing faceted volcano plots.}
+\item{volcano_list}{A named list of individual volcano plots per contrast.}
+\item{MD_plot_faceted}{A \code{ggplot} object showing faceted MD plots.}
+}
+}
 \description{
 This function performs differential stability analysis on protein abundance data from a DIA-NN \code{.parquet} file.
 It uses the \code{limma} package to compute moderated statistics, generates volcano plots, and MD plots.
