@@ -1,3 +1,20 @@
+#' Differential Stability Analysis by PELSA from DIA-NN Output
+#'
+#' This function performs differential stability analysis on protein abundance data from a DIA-NN `.parquet` file.
+#' It uses the `limma` package to compute moderated statistics, generates volcano plots, and MD plots.
+#'
+#' The implementation is heavily inspired by code from the limma-for-proteomics
+#' GitHub repository: \url{https://github.com/41ison/limma-for-proteomics}
+#'
+#' @param file Path to the DIA-NN `.parquet` report file for DIA data or to PD-exported txt file for DDA.
+#' @param extract.after Regex pattern to extract group names from sample names (after a specific pattern).
+#' @param extract.before Regex pattern to extract group names from sample names (before a specific pattern).
+#' @param ctrl.name Name of the control group (e.g., "Ctrl").
+#' @param FC.cutoff Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).
+#' @param p.cutoff Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).
+#' @param p.adjust p-value adjustment method in limma::topTable
+
+
 analyze.DIAPELSA <- function(file,
                             extract.after = "^",
                             extract.before = "_",
