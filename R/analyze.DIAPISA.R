@@ -24,6 +24,7 @@
 #' @param xic.folder Folder in which the `xic.parquet` files are saved.
 #' @param acq Acqusition mode. DIA or DDA?
 #' @param TMT.labels String vector of TMT-labelled samples names in the same order as in the data file.
+#' @param TMT String: either TMT10 or TMT16.
 #'
 #' @importFrom diann diann_matrix
 #' @importFrom arrow read_parquet
@@ -32,6 +33,7 @@
 #' @importFrom tidyr separate
 #' @importFrom purrr map
 #' @import limma
+#' @import tidyverse
 #' @importFrom ggrepel geom_text_repel
 #'
 #' @return A named list with the following elements:
@@ -75,7 +77,8 @@ analyze.DIAPISA <- function(file,
                             export.xic=FALSE,
                             xic.folder="report_xic",
                             acq="DIA",
-                            TMT.labels=NA
+                            TMT.labels=NA,
+                            TMT="TMT16"
 ) {
 
   if(acq=="DDA") {
@@ -110,10 +113,19 @@ analyze.DIAPISA <- function(file,
                                     proteotypic.only = TRUE,
                                     pg.q = 0.01)
   } else if(acq=="DDA") {
-    prot_mtx <- fread(file) %>%
-      dplyr::select(Accession, contains("Abundances")) %>%
-      dplyr::select(!contains("CV",ignore.case=FALSE)) %>%
-      column_to_rownames("Accession")
+    if(TMT=="TMT10") {
+      prot_mtx <- fread(file) %>%
+        dplyr::select(Accession, contains("Abundances")) %>%
+        dplyr::select(!contains("CV",ignore.case=FALSE)) %>%
+        column_to_rownames("Accession")
+    } else if(TMT=="TMT16") {
+      prot_mtx <- fread(file) %>%
+        dplyr::select(Accession, contains("Abundance:")) %>%
+        column_to_rownames("Accession")
+    } else {
+      stop("TMT must be TMT10 or TMT16!")
+    }
+
     if(ncol(prot_mtx)==length(TMT.labels)) {
       prot_mtx <- prot_mtx %>% setNames(TMT.labels)
     } else {

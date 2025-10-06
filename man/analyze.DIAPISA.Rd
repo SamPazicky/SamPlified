@@ -22,7 +22,8 @@ analyze.DIAPISA(
   export.xic = FALSE,
   xic.folder = "report_xic",
   acq = "DIA",
-  TMT.labels = NA
+  TMT.labels = NA,
+  TMT = "TMT16"
 )
 }
 \arguments{
@@ -61,6 +62,8 @@ analyze.DIAPISA(
 \item{acq}{Acqusition mode. DIA or DDA?}
 
 \item{TMT.labels}{String vector of TMT-labelled samples names in the same order as in the data file.}
+
+\item{TMT}{String: either TMT10 or TMT16.}
 }
 \value{
 A named list with the following elements:
