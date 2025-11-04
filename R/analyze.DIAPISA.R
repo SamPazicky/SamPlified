@@ -110,7 +110,7 @@ analyze.DIAPISA <- function(file,
       stop(stopmessage)
     }
 
-    cnt <- max(diann_report$Run.Index)+1
+    cnt <- length(unique(diann_report$Run))+1
     if(pulses==1) {
       cat("Analyzing", cnt/pulses, "samples run in DIA mode.\n")
     } else {
