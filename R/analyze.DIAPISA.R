@@ -13,6 +13,7 @@
 #' @param pos.ctrl.name Regex pattern to extract the positive control sample.
 #' @param pos.ctrl.id ID of the protein that is the hit in the positive sample.
 #' @param exclude Vector of patterns, which will be matched to samples and those will be excluded from the analysis.
+#' @param replicates Numeric. Number of replicates. Default is 3.
 #' @param FC.cutoff Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).
 #' @param p.cutoff Adjusted p-value cutoff for determining significance for hits (first value) and candidates (second value) (default is c(0.01,0.05)).
 #' @param p.adjust p-value adjustment method in limma::topTable
@@ -23,6 +24,7 @@
 #' @param export.xic Logical. Should the XIC of the hit proteins be plotted? This takes additional time (5-10s per hit).
 #' @param xic.folder Folder in which the `xic.parquet` files are saved.
 #' @param acq Acqusition mode. DIA or DDA?
+#' @param DIA.filtering Numeric vector. Threshold for Lib.PG.Q.Value, Lib.Q.Value and PG.Q.Value, in this order.
 #' @param TMT.labels String vector of TMT-labelled samples names in the same order as in the data file.
 #' @param TMT String: either TMT10 or TMT16.
 #'
@@ -67,6 +69,7 @@ analyze.DIAPISA <- function(file,
                             pos.ctrl.name=NA,
                             pos.ctrl.id="PF3D7_0417200.1-p1",
                             exclude=pos.ctrl.name,
+                            replicates=3,
                             FC.cutoff = c(1.2,1.2),
                             p.cutoff = c(0.01,0.05),
                             p.adjust = "BH",
@@ -77,6 +80,7 @@ analyze.DIAPISA <- function(file,
                             export.xic=FALSE,
                             xic.folder="report_xic",
                             acq="DIA",
+                            DIA.filtering=c(0.01,0.01,0.01),
                             TMT.labels=NA,
                             TMT="TMT16"
 ) {
@@ -94,10 +98,17 @@ analyze.DIAPISA <- function(file,
   exclude <- c(pos.ctrl.name,exclude) %>% unique()
 
   if(acq=="DIA") {
-    diann_report <- arrow::read_parquet(file) %>%
-      dplyr::filter(Lib.PG.Q.Value <= 0.01 & Lib.Q.Value <= 0.01 & PG.Q.Value <= 0.01) %>%
+    diann_report <- arrow::read_parquet(file)
+    samples <- diann_report %>% pull(Run) %>% unique()
+    diann_report <- diann_report %>%
+      dplyr::filter(Lib.PG.Q.Value <= DIA.filtering[1] & Lib.Q.Value <= DIA.filtering[2] & PG.Q.Value <= DIA.filtering[3]) %>%
       dplyr::mutate(File.Name = Run) %>%
       dplyr::filter(str_detect(Protein.Ids, "cRAP|Biognosys", negate = TRUE))
+    samples_out <- setdiff(samples,unique(diann_report$Run))
+    if(length(samples_out)!=0) {
+      stopmessage <- paste0("Some samples fell out of analysis after DIA data filtering! Samples: ",paste(samples_out,collapse=", "))
+      stop(stopmessage)
+    }
 
     cnt <- max(diann_report$Run.Index)+1
     if(pulses==1) {
@@ -111,7 +122,7 @@ analyze.DIAPISA <- function(file,
                                     id.header = "Protein.Ids",
                                     quantity.header = report.quant.col,
                                     proteotypic.only = TRUE,
-                                    pg.q = 0.01)
+                                    pg.q = DIA.filtering[3])
   } else if(acq=="DDA") {
     if(TMT=="TMT10") {
       prot_mtx <- fread(file) %>%
@@ -153,7 +164,7 @@ analyze.DIAPISA <- function(file,
     sel.score <- prot_mtx[,str_detect(colnames(prot_mtx),paste(c(pos.ctrl.name,ctrl.name),collapse="|"))] %>%
       as.data.frame() %>%
       dplyr::select(contains(pos.ctrl.name),contains(ctrl.name)) %>%
-      setNames(c(pos.ctrl.name,paste0("Ctrl",1:3))) %>%
+      setNames(c(pos.ctrl.name,paste0("Ctrl",1:replicates))) %>%
       rownames_to_column("id") %>%
       pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
       mutate(group=ifelse(str_detect(condition,"Ctrl"),"Ctrl","Pos.Ctrl")) %>%

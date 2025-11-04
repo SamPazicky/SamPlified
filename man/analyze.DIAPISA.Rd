@@ -12,6 +12,7 @@ analyze.DIAPISA(
   pos.ctrl.name = NA,
   pos.ctrl.id = "PF3D7_0417200.1-p1",
   exclude = pos.ctrl.name,
+  replicates = 3,
   FC.cutoff = c(1.2, 1.2),
   p.cutoff = c(0.01, 0.05),
   p.adjust = "BH",
@@ -22,6 +23,7 @@ analyze.DIAPISA(
   export.xic = FALSE,
   xic.folder = "report_xic",
   acq = "DIA",
+  DIA.filtering = c(0.01, 0.01, 0.01),
   TMT.labels = NA,
   TMT = "TMT16"
 )
@@ -40,6 +42,8 @@ analyze.DIAPISA(
 \item{pos.ctrl.id}{ID of the protein that is the hit in the positive sample.}
 
 \item{exclude}{Vector of patterns, which will be matched to samples and those will be excluded from the analysis.}
+
+\item{replicates}{Numeric. Number of replicates. Default is 3.}
 
 \item{FC.cutoff}{Fold change cutoff for determining significance for hits (first value) and candidates (second value) (default is c(1.2,1.2)).}
 
@@ -60,6 +64,8 @@ analyze.DIAPISA(
 \item{xic.folder}{Folder in which the \code{xic.parquet} files are saved.}
 
 \item{acq}{Acqusition mode. DIA or DDA?}
+
+\item{DIA.filtering}{Numeric vector. Threshold for Lib.PG.Q.Value, Lib.Q.Value and PG.Q.Value, in this order.}
 
 \item{TMT.labels}{String vector of TMT-labelled samples names in the same order as in the data file.}
 
