@@ -110,7 +110,7 @@ analyze.DIAPISA <- function(file,
       stop(stopmessage)
     }
 
-    cnt <- length(unique(diann_report$Run))+1
+    cnt <- length(unique(diann_report$Run))+ (ifelse(is.na(exclude),0,length(exclude)))
     if(pulses==1) {
       cat("Analyzing", cnt/pulses, "samples run in DIA mode.\n")
     } else {
@@ -176,13 +176,13 @@ analyze.DIAPISA <- function(file,
       filter(id==pos.ctrl.id) %>%
       pull(z) %>%
       round(1)
+    cat(paste0("Selection score is ", sel.score,"!\n"))
+    cat("Selection score must be above 2. The higher, the better!\n")
   } else {
     sel.score <- NA
+    cat("Selection score not calculated!\n")
   }
 
-
-  cat(paste0("Selection score is ", sel.score,"!\n"))
-  cat("Selection score must be above 2. The higher, the better!\n")
 
   #quantifying pulseDIA
   if(pulses>1) {
@@ -418,8 +418,15 @@ analyze.DIAPISA <- function(file,
     rownames_to_column("id") %>%
     filter(id %in% allhits) %>%
     pivot_longer(cols=!id,names_to="samplerep",values_to="Abundance") %>%
-    filter(!samplerep %in% exclude) %>%
-    separate_wider_delim(samplerep,extract.before,names=c("Sample","Replicate")) %>%
+    filter(!samplerep %in% exclude)  %>%
+    separate_wider_regex(
+      samplerep,
+      patterns = c(
+        Sample = paste0(".*(?=", extract.before, ")"),     # everything before last match
+        Replicate  = paste0(extract.before, ".*$")             # last match + remainder
+      )
+    ) %>%
+    mutate(Replicate=str_remove(Replicate,extract.before)) %>%
     group_by(id,Sample) %>%
     dplyr::mutate(meanAbundance=mean(Abundance,na.omit=TRUE)) %>%
     ungroup() %>%
