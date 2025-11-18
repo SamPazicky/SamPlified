@@ -169,7 +169,7 @@ analyze.DIAPISA <- function(file,
       pivot_longer(cols=!id,names_to="condition",values_to="abundance") %>%
       mutate(group=ifelse(str_detect(condition,"Ctrl"),"Ctrl","Pos.Ctrl")) %>%
       group_by(id,group) %>%
-      dplyr::summarise(mu=mean(abundance),sd=sd(abundance), .groups="drop") %>%
+      dplyr::summarise(mu=mean(abundance,na.rm=TRUE),sd=sd(abundance,na.rm=TRUE), .groups="drop") %>%
       ungroup() %>%
       pivot_wider(id_cols=id, names_from=group, names_sep="_",values_from=c(mu,sd)) %>%
       mutate(z=(mu_Pos.Ctrl-mu_Ctrl)/sd_Ctrl) %>%
@@ -202,7 +202,8 @@ analyze.DIAPISA <- function(file,
         dplyr::summarise(quant=max(quant,na.rm=TRUE),.groups="keep") %>%
         ungroup() %>%
         pivot_wider(id_cols=id,names_from=sample,values_from=quant) %>%
-        column_to_rownames("id")
+        column_to_rownames("id") %>%
+        setNames(make.names(names(.)))
     } else if(pulse.quant=="prot.mean") {
       prot_mtx_filtered_p <- prot_mtx_filtered %>%
         as.data.frame() %>%
@@ -219,7 +220,8 @@ analyze.DIAPISA <- function(file,
         dplyr::summarise(quant=mean(quant,na.rm=TRUE),.groups="keep") %>%
         ungroup() %>%
         pivot_wider(id_cols=id,names_from=sample,values_from=quant) %>%
-        column_to_rownames("id")
+        column_to_rownames("id") %>%
+        setNames(make.names(names(.)))
     } else if(pulse.quant=="pept") {
       prot_mtx_filtered_p <- diann_report %>%
         filter(Protein.Group != "") %>%
@@ -231,13 +233,15 @@ analyze.DIAPISA <- function(file,
         ungroup() %>%
         { if (!is.null(exclude)) filter(., !str_detect(Sample, exclude)) else . } %>%
         pivot_wider(id_cols=Protein.Group,names_from=Sample,values_from=Summed.Quantity) %>%
-        column_to_rownames("Protein.Group")
+        column_to_rownames("Protein.Group") %>%
+        setNames(make.names(names(.)))
     }
 
   } else {
     prot_mtx_filtered_p <- prot_mtx_filtered %>%
       as.data.frame() %>%
-      setNames(str_extract(names(.), paste0("(?<=",extract.after,").*")))
+      setNames(str_extract(names(.), paste0("(?<=",extract.after,").*"))) %>%
+      setNames(make.names(names(.)))
   }
 
   # raw protein table
