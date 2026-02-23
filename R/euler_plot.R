@@ -67,7 +67,7 @@ euler_plot <- function(
     unstack()
 
   setlist <- lapply(setlist, function(x) {
-    if (is.null(x)) c() else x
+    if (is.null(x)) vector(mode="character",length=0) else x
   })
 
 
