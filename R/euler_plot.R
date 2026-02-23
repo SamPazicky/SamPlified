@@ -66,6 +66,10 @@ euler_plot <- function(
     dplyr::select(id,condition) %>%
     unstack()
 
+  setlist <- lapply(setlist, function(x) {
+    if (is.null(x)) "" else x
+  })
+
 
   # Validate input: each element in setlist should be a vector
   for (i in seq_along(setlist)) {
