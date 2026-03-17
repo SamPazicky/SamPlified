@@ -37,6 +37,7 @@
 #' @import limma
 #' @import tidyverse
 #' @importFrom ggrepel geom_text_repel
+#' @importFrom data.table fread fwrite rbindlist
 #'
 #' @return A named list with the following elements:
 #' \describe{
@@ -85,6 +86,9 @@ analyze.DIAPISA <- function(file,
                             TMT="TMT16"
 ) {
 
+  rename_duplicate_cols <- function(df) {
+    df %>% setNames(names(df) %>% split(names(df)) %>% imap(~ if(length(.x)>1) paste0(.x,"_",seq_along(.x)) else .x) %>% unsplit(names(df)))
+  }
   if(acq=="DDA") {
     pulses=1
     export.xic=FALSE
@@ -124,21 +128,18 @@ analyze.DIAPISA <- function(file,
                                     proteotypic.only = TRUE,
                                     pg.q = DIA.filtering[3])
   } else if(acq=="DDA") {
-    if(TMT=="TMT10") {
+    if(TMT=="TMT10"|TMT=="TMT16") {
+
       prot_mtx <- fread(file) %>%
         dplyr::select(Accession, contains("Abundances")) %>%
         dplyr::select(!contains("CV",ignore.case=FALSE)) %>%
-        column_to_rownames("Accession")
-    } else if(TMT=="TMT16") {
-      prot_mtx <- fread(file) %>%
-        dplyr::select(Accession, contains("Abundance:")) %>%
         column_to_rownames("Accession")
     } else {
       stop("TMT must be TMT10 or TMT16!")
     }
 
     if(ncol(prot_mtx)==length(TMT.labels)) {
-      prot_mtx <- prot_mtx %>% setNames(TMT.labels)
+      prot_mtx <- prot_mtx %>% setNames(TMT.labels) %>% rename_duplicate_cols()
     } else {
       stop("There are more samples than names given in TMT.labels argument!")
     }
